@@ -1,7 +1,6 @@
-from utils import *
-import os
-import tensorflow as tf
-from typing import Dict
+import tensorflow_io as tfio
+
+from data_processing.utils import *
 
 
 class DataWriter:
@@ -14,7 +13,9 @@ class DataWriter:
         """Process datasets"""
 
         for dataset_name in self.datasets:
-            dataset_path = os.path.join(self.bucket_path, self.config["dataset"][dataset_name])
+            dataset_path = os.path.join(
+                self.bucket_path, self.config["dataset"][dataset_name]
+            )
             speaker_ids, speaker_paths = find_speaker_paths(dataset_path)
 
             for speaker_path, speaker_id in zip(speaker_paths, speaker_ids):
@@ -33,6 +34,29 @@ class DataWriter:
                     for processed_file in processed_files:
                         tf_example = spectrogram_example(processed_file, label)
                         writer.write(tf_example.SerializeToString())
+
+    def process_files(self, file_path: str) -> tf.Tensor:
+        """Load audio file from disk and perform processing step to get mel spectorgram"""
+        audio_tensor = load_audio(file_path)
+
+        tensor = tf.cast(audio_tensor, tf.float32) / 32768.0
+        tensor = tensor[:, 0]
+
+        spectogram = tfio.experimental.audio.spectrogram(
+            tensor,
+            nfft=self.config["nfft"],
+            window=self.config["window"],
+            stride=self.config["stride"],
+        )
+        mel_spectogram = tfio.experimental.audio.melscale(
+            spectogram,
+            rate=self.config["rate"],
+            mels=self.config["mels"],
+            fmin=self.config["fmin"],
+            fmax=self.config["fmax"],
+        )
+
+        return mel_spectogram
 
 
 class DataReader:

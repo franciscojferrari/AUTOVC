@@ -1,7 +1,7 @@
 import yaml
 
 from pathlib import Path
-from DataProcessing import DataWriter, DataReader
+from data_processing.DataProcessing import DataWriter, DataReader
 
 def main(config):
 
@@ -9,7 +9,6 @@ def main(config):
     bucket_name = "DataSet"  # Name of how bucket is mounted
     datasets = ["dev-clean"]
     writer = DataWriter(bucket_name, datasets, config)
-
     # writer.process_datasets()
 
     # Read dataset.

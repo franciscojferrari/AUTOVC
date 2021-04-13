@@ -2,6 +2,16 @@ dataset:
     train-clean-100: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resource_12_train-clean-1001N3R1aarMDBm8Ulx12juQyeKXyoKpD3HFrDmTsu79uI.tar.gz.incomplete_a3732f68f6f246c48c3e5c735385d394/LibriSpeech/train-clean-100"
     dev-clean: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resources_12_dev-cleandvh9CQZQYX_KDKyPiLlBbg6_gDUKy5ezQ6hfqQNyirM.tar.gz/LibriSpeech/dev-clean"
 
+# Paths.
 write_path: "processed_datasets/librispeech"
 base_read_path: "processed_datasets/librispeech"
 bucket_name: "DataSet"
+
+# Processing variables.
+nfft: 512
+window: 512
+stride: 256
+rate: 160000
+mels: 128
+fmin: 0
+fmax: 8000

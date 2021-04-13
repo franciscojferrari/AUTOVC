@@ -25,23 +25,6 @@ def load_audio(file_path: str) -> tf.Tensor:
     return audio
 
 
-def process_files(file_path: str) -> tf.Tensor:
-    """Load audio file from disk and perform processing step to get mel spectorgram"""
-    audio_tensor = load_audio(file_path)
-
-    tensor = tf.cast(audio_tensor, tf.float32) / 32768.0
-    tensor = tensor[:, 0]
-
-    spectogram = tfio.experimental.audio.spectrogram(
-        tensor, nfft=512, window=512, stride=256
-    )
-    mel_spectogram = tfio.experimental.audio.melscale(
-        spectogram, rate=16000, mels=128, fmin=0, fmax=8000
-    )
-
-    return mel_spectogram
-
-
 def _bytes_feature(value: Any) -> tf.train.Feature:
     """Returns a bytes_list from a string / byte."""
     if isinstance(value, type(tf.constant(0))):
