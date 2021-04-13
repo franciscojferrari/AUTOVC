@@ -1,0 +1,75 @@
+import tensorflow as tf
+
+
+def speaker_centroids(embeddings):
+    """
+    Inputs:
+        embeddings: Embeddings from encoder, shape=(speakers_per_batch, utterances_per_speaker, embedding_size)
+
+    Returns
+        Speaker centroids of shape=(speakers_per_batch, 1, embedding_size).
+    """
+    speaker_centroids = tf.math.reduce_mean(embeddings, axis=1, keepdims=True)
+    speaker_centroids = tf.identity(speaker_centroids) / (
+        tf.norm(speaker_centroids, axis=2, keepdims=True) + 1e-6
+    )
+
+    return speaker_centroids
+
+
+def utterance_centroids(embeddings):
+    """
+    Inputs:
+        embeddings: Embeddings from encoder, shape=(speakers_per_batch, utterances_per_speaker, embedding_size)
+
+    Returns
+        Utterance centroids of shape=(speakers_per_batch, 1, embedding_size).
+    """
+    utterances_per_speaker = embeddings.shape[1]
+
+    utterance_centroids = (
+        tf.math.reduce_sum(embeddings, axis=1, keepdims=True) - embeddings
+    )
+    utterance_centroids /= utterances_per_speaker - 1
+    utterance_centroids = tf.identity(utterance_centroids) / (
+        tf.norm(utterance_centroids, axis=2, keepdims=True) + 1e-6
+    )
+
+    return utterance_centroids
+
+
+def similarity_matrix(embeddings, speaker_centroids, utterance_centroids):
+    """
+    Inputs:
+        embeddings: Embeddings from encoder, shape=(speakers_per_batch, utterances_per_speaker, embedding_size)
+        speaker_centroids: Speaker centroids of shape=(speakers_per_batch, 1, embedding_size).
+        utterance_centroids: Utterance centroids of shape=(speakers_per_batch, 1, embedding_size).
+
+    Returns
+        Similarity matrix of shape=(speakers_per_batch, utterances_per_speaker, speakers_per_batch).
+    """
+    speakers_per_batch = embeddings.shape[0]
+    mask_matrix = 1 - tf.eye(speakers_per_batch)
+    sim_values = []
+
+    for j in range(speakers_per_batch):
+        mask = tf.transpose(tf.where(mask_matrix[j]))[0]
+        a = tf.reduce_sum(tf.gather(embeddings, mask) * speaker_centroids[j], axis=2)
+        b = tf.reshape(
+            tf.reduce_sum(embeddings[j] * utterance_centroids[j], axis=1), shape=(1, -1)
+        )
+
+        # Make sure that b is inserted in the right place.
+        a = tf.unstack(a, axis=0)
+        b = tf.unstack(b, axis=0)
+        a.insert(j, b[0])
+        c = tf.stack(a, axis=-1)
+
+        sim_values.append(c)
+
+    sim_values = [
+        tf.expand_dims(tf.transpose(m), axis=-1) for m in sim_values
+    ]  # Add additional dimension
+    sim_matrix = tf.concat(sim_values, axis=2)
+
+    return sim_matrix
