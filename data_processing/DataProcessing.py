@@ -25,7 +25,7 @@ class DataWriter:
                 file_paths = find_flac_paths(speaker_path)
 
                 file_data_set = build_file_dataset(file_paths)
-                processed_files = transform_files(file_data_set, process_files)
+                processed_files = transform_files(file_data_set, self.process_files)
 
                 record_file_name = f"{label}.tfrecords"
                 write_path = f"{self.bucket_name}/processed_datasets/librispeech"
