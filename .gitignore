@@ -134,3 +134,6 @@ credentials/*
 
 #Misc
 .DS_Store
+
+#Pycharm
+.idea/*
