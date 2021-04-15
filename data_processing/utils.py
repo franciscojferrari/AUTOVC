@@ -42,7 +42,7 @@ def spectrogram_example(spectrogram_string: str, label: int, subset:str) -> tf.t
     feature = {
         "label": _int64_feature(label),
         "mel_spectrogram": _bytes_feature(serialized_tensor),
-        "subset": _bytes_feature(tf.io.serialize_tensor((subset))
+        "subset": _bytes_feature(tf.io.serialize_tensor(subset))
     }
 
     return tf.train.Example(features=tf.train.Features(feature=feature))
