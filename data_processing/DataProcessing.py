@@ -34,7 +34,7 @@ class DataWriter:
                     processed_files).numpy()
                 with tf.io.TFRecordWriter(record_file) as writer:
                     for i, processed_file in processed_files.enumerate():
-                        subset = "train" if i <= train_split * n_samples else "test"
+                        subset = b"train" if i <= train_split * n_samples else b"test"
                         if verbose:
                             plt.figure(figsize=(15,4))
                             data = tf.math.log(processed_file).numpy()
