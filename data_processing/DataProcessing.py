@@ -74,7 +74,7 @@ class DataReader:
         self.feature_description = {
             "label": tf.io.FixedLenFeature([], tf.int64),
             "mel_spectrogram": tf.io.RaggedFeature(tf.string),
-            "sub_set": tf.io.FixedLenFeature([], tf.string)
+            "subset": tf.io.FixedLenFeature([], tf.string)
         }  # Assuming that the data only contains these two attributes
 
         self.speaker_files = None
