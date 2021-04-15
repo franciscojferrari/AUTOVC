@@ -28,7 +28,7 @@ class DataWriter:
                 processed_files = transform_files(file_data_set, self.process_files)
 
                 record_file_name = f"{label}.tfrecords"
-                write_path = f"{self.bucket_name}/processed_datasets/librispeech"
+                write_path = f"{self.bucket_path}/processed_datasets/librispeech"
                 record_file = os.path.join(write_path, record_file_name)
                 with tf.io.TFRecordWriter(record_file) as writer:
                     for processed_file in processed_files:
