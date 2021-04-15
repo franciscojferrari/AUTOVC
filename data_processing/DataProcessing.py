@@ -27,7 +27,7 @@ class DataWriter:
                 file_data_set = build_file_dataset(file_paths)
                 processed_files = transform_files(file_data_set, self.process_files)
 
-                record_file_name = f"{dataset_name}/{label}.tfrecords"
+                record_file_name = f"{label}.tfrecords"
                 write_path = f"{self.bucket_path}/processed_datasets/librispeech"
                 record_file = os.path.join(write_path, record_file_name)
                 n_samples = tf.data.experimental.cardinality(
