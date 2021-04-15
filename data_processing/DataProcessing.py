@@ -9,7 +9,7 @@ class DataWriter:
         self.datasets = datasets
         self.config = config
 
-    def process_datasets(self, verbose=False):
+    def process_datasets(self, verbose=False, train_split=0.8):
         """Process datasets"""
 
         for dataset_name in self.datasets:
@@ -30,14 +30,17 @@ class DataWriter:
                 record_file_name = f"{dataset_name}/{label}.tfrecords"
                 write_path = f"{self.bucket_path}/processed_datasets/librispeech"
                 record_file = os.path.join(write_path, record_file_name)
+                n_samples = tf.data.experimental.cardinality(
+                    processed_files).numpy()
                 with tf.io.TFRecordWriter(record_file) as writer:
-                    for processed_file in processed_files:
+                    for i, processed_file in processed_files.enumerate():
+                        subset = "train" if i <= train_split * n_samples else "test"
                         if verbose:
                             plt.figure(figsize=(15,4))
                             data = tf.math.log(processed_file).numpy()
                             plt.imshow(data, aspect="auto")
                             plt.show()
-                        tf_example = spectrogram_example(processed_file, label)
+                        tf_example = spectrogram_example(processed_file, label, subset)
                         writer.write(tf_example.SerializeToString())
 
     def process_files(self, file_path: str) -> tf.Tensor:
@@ -71,6 +74,7 @@ class DataReader:
         self.feature_description = {
             "label": tf.io.FixedLenFeature([], tf.int64),
             "mel_spectrogram": tf.io.RaggedFeature(tf.string),
+            "sub_set": tf.io.FixedLenFeature([], tf.string)
         }  # Assuming that the data only contains these two attributes
 
         self.speaker_files = None

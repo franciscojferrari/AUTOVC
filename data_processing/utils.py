@@ -1,5 +1,4 @@
 import os
-
 import tensorflow as tf
 import tensorflow_io as tfio
 
@@ -39,11 +38,12 @@ def _int64_feature(value: int) -> tf.train.Feature:
 
 
 # Create a dictionary with features that may be relevant.
-def spectrogram_example(spectrogram_string: str, label: int) -> tf.train.Example:
+def spectrogram_example(spectrogram_string: str, label: int, subset:str) -> tf.train.Example:
     serialized_tensor = tf.io.serialize_tensor(spectrogram_string)
     feature = {
         "label": _int64_feature(label),
         "mel_spectrogram": _bytes_feature(serialized_tensor),
+        "sub_set": _bytes_feature(subset)
     }
 
     return tf.train.Example(features=tf.train.Features(feature=feature))
