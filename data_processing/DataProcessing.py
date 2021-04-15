@@ -9,7 +9,7 @@ class DataWriter:
         self.datasets = datasets
         self.config = config
 
-    def process_datasets(self):
+    def process_datasets(self, verbose=False):
         """Process datasets"""
 
         for dataset_name in self.datasets:
@@ -32,12 +32,12 @@ class DataWriter:
                 record_file = os.path.join(write_path, record_file_name)
                 with tf.io.TFRecordWriter(record_file) as writer:
                     for processed_file in processed_files:
-                        plt.figure(figsize=(15,4))
-                        data = tf.math.log(processed_file).numpy()
-                        plt.imshow(data, aspect="auto")
-                        plt.show()
+                        if verbose:
+                            plt.figure(figsize=(15,4))
+                            data = tf.math.log(processed_file).numpy()
+                            plt.imshow(data, aspect="auto")
+                            plt.show()
                         tf_example = spectrogram_example(processed_file, label)
-
                         writer.write(tf_example.SerializeToString())
 
     def process_files(self, file_path: str) -> tf.Tensor:
