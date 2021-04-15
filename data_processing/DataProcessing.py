@@ -32,10 +32,8 @@ class DataWriter:
                 record_file = os.path.join(write_path, record_file_name)
                 with tf.io.TFRecordWriter(record_file) as writer:
                     for processed_file in processed_files:
-                        tensor = tf.io.parse_tensor(processed_file.numpy()[
-                                                    0], out_type=tf.float32)
                         plt.figure(figsize=(15,4))
-                        data = tf.math.log(tensor).numpy()
+                        data = tf.math.log(processed_file).numpy()
                         plt.imshow(data, aspect="auto")
                         plt.show()
                         tf_example = spectrogram_example(processed_file, label)
