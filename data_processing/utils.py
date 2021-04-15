@@ -31,11 +31,6 @@ def _bytes_feature(value: Any) -> tf.train.Feature:
         value = value.numpy()  # BytesList won't unpack a string from an EagerTensor.
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
-
-def serialize_array(array: Any) -> tf.tensor :
-  array = tf.io.serialize_tensor(array)
-  return array
-
 def _int64_feature(value: int) -> tf.train.Feature:
     """Returns an int64_list from a bool / enum / int / uint."""
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
@@ -47,7 +42,7 @@ def spectrogram_example(spectrogram_string: str, label: int, subset:str) -> tf.t
     feature = {
         "label": _int64_feature(label),
         "mel_spectrogram": _bytes_feature(serialized_tensor),
-        "subset": _bytes_feature(serialize_array(subset))
+        "subset": _bytes_feature(tf.io.serialize_tensor((subset))
     }
 
     return tf.train.Example(features=tf.train.Features(feature=feature))
