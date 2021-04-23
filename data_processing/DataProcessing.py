@@ -36,7 +36,7 @@ class DataWriter:
                     for i, processed_file in processed_files.enumerate():
                         subset = b"train" if i <= train_split * n_samples else b"test"
                         if verbose:
-                            plt.figure(figsize=(15,4))
+                            plt.figure(figsize=(15, 4))
                             data = tf.math.log(processed_file).numpy()
                             plt.imshow(data, aspect="auto")
                             plt.show()
@@ -47,7 +47,7 @@ class DataWriter:
         """Load audio file from disk and perform processing step to get mel spectorgram"""
         audio_tensor = load_audio(file_path)
 
-        tensor = tf.cast(audio_tensor, tf.float32) / 32768.0
+        tensor = tf.cast(audio_tensor, tf.float32) / 32768.0  # TODO
         tensor = tensor[:, 0]
 
         spectogram = tfio.experimental.audio.spectrogram(

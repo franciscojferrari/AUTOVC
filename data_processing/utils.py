@@ -17,7 +17,6 @@ def transform_files(files: tf.data.Dataset, process_fn: Any) -> tf.data.Dataset:
     files = files.map(process_fn, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     return files
 
-
 def load_audio(file_path: str) -> tf.Tensor:
     """Load and decode flac files"""
     audio = tf.io.read_file(file_path)
