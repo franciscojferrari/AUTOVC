@@ -1,0 +1,21 @@
+# Data.
+dataset:
+    train-clean-100: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resource_12_train-clean-1001N3R1aarMDBm8Ulx12juQyeKXyoKpD3HFrDmTsu79uI.tar.gz/LibriSpeech/train-clean-100"
+    train-clean-360: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resource_12_train-clean-360FGpWSWIX6WwUM0oWDfl__-3W4KBOZrnFrw1Avjx5Ls8.tar.gz.incomplete_419af91646134b46a332a6d1f38e0261/LibriSpeech/train-clean-360"
+    train-clean-500: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resource_12_train-other-5003bIvJ_luwWNkXVMhVVnfaqNlFfJuAd1weYGINQrcttI.tar.gz.incomplete_4fa7adaee06441e9b95cf97e93617ee2/LibriSpeech/train-other-500"
+    dev-clean: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resources_12_dev-cleandvh9CQZQYX_KDKyPiLlBbg6_gDUKy5ezQ6hfqQNyirM.tar.gz/LibriSpeech/dev-clean"
+    test-clean: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resources_12_test-cleanOf3lJeWWctxtFVGRmxR49yRDipWqVfh0tXa-IZZ-bCM.tar.gz/LibriSpeech/test-clean"
+
+# Paths.
+write_path: "processed_datasets/librispeech"
+base_read_path: "processed_datasets/librispeech"
+bucket_name: "DataSet"
+
+# Processing variables.
+nfft: 512
+window: 512
+stride: 256
+rate: 160000
+mels: 128
+fmin: 0
+fmax: 8000
