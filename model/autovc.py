@@ -1,31 +1,37 @@
 import tensorflow as tf
+from tensorflow.python.framework.ops import convert_n_to_tensor
 from layers import ConvNorm
 tfk = tf.keras
 tfkl = tfk.layers
 
-class Decoder(tfk.Layer):
-    def __init__(self, name, dim_pre, **kwargs):
-        super().__init__(name=name, **kwargs)
 
-        self.lstms = []
-        for i in range(3):
-            self.lstms.append(
-                tfkl.LSTM(name=f"dec_lstm_{i}", units=dim_pre, return_sequences=True))
+class AutoVC(tfk.Model):
+    def __init__(self, name, dim_pre,*args, **kwargs):
+        super(AutoVC).__init__(*args, **kwargs)
+        self.name = name
 
-        self.convolutions = []
-        for i in range(3):
-            # TODO double check padding
-            self.convolutions.append(
-                ConvNorm(name=f"dec_conv_{i}", filters=dim_pre,
-                         kernel_size=5, stride=1, dilation=1, activation="relu")
-            )
+        self.encoder = None # TODO
+        self.decoder = self.build_decoder(dim_pre)
+        self.postnet = self.build_postnet()
 
-        self.linear_projection = tfkl.Dense(80)
+    def build_decoder(self, dim_pre):
+        _3convs = [ConvNorm(name=f"dec_conv_{i}", filters=dim_pre,
+                          kernel_size=5, stride=1, dilation=1, activation="relu") for i in range(3)]
+        _3lstms = [
+            tfkl.LSTM(name=f"dec_lstm_{i}", units=1024, return_sequences=True) for i in range(3)]
+        decoder = tfk.Sequential((_3convs + _3lstms + tfkl.Dense(80)))
+        return decoder
+    
+    def build_postnet(self):
+        convs = [ConvNorm(name=f"dec_conv_{i}", filters=512,
+                          kernel_size=5, stride=1, dilation=1, activation="tanh") for i in range(5)]
+        convs.append(ConvNorm(name=f"dec_conv_{5}", filters=80,
+                          kernel_size=5, stride=1, dilation=1, activation=None))
+        postnet = tfk.Sequential(convs)
+        return postnet
 
-    def call(self, x):
-        x = self.lstms[0](x)  # [batch, time, lstm_units]
-        for conv in self.convolutions:
-            x = conv(x)
-        x = self.lstms[2](self.lstms[1](x))
 
-        return self.linear_projection(x)
+
+
+
+    
