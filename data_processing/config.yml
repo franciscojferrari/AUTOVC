@@ -5,17 +5,21 @@ dataset:
     train-clean-500: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resource_12_train-other-5003bIvJ_luwWNkXVMhVVnfaqNlFfJuAd1weYGINQrcttI.tar.gz.incomplete_4fa7adaee06441e9b95cf97e93617ee2/LibriSpeech/train-other-500"
     dev-clean: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resources_12_dev-cleandvh9CQZQYX_KDKyPiLlBbg6_gDUKy5ezQ6hfqQNyirM.tar.gz/LibriSpeech/dev-clean"
     test-clean: "librispeech/downloads/extracted/TAR_GZ.openslr.org_resources_12_test-cleanOf3lJeWWctxtFVGRmxR49yRDipWqVfh0tXa-IZZ-bCM.tar.gz/LibriSpeech/test-clean"
+    vctk: "vctk/mic1/1.0.0"
 
 # Paths.
-write_path: "processed_datasets/librispeech"
-base_read_path: "processed_datasets/librispeech"
+write_path: "processed_datasets"
+base_read_path: "processed_datasets"
 bucket_name: "DataSet"
+
+dataset_tf: "vctk"  # The dataset to process ["librispeech", "vctk"]
+subdataset: "train-clean-100"
 
 # Processing variables.
 nfft: 512
 window: 512
 stride: 256
-rate: 160000
+rate: 16000
 mels: 128
 fmin: 0
 fmax: 8000

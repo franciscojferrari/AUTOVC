@@ -13,11 +13,8 @@ def main(config):
     # writer.process_datasets()
 
     # Read dataset.
-    base_path = config["base_read_path"]
-    dataset = "dev-clean"
-    assert dataset in config["dataset"]
-    reader = DataReader(base_path, dataset)
-    # reader.read_data_set()
+    reader = DataReader(config)
+    # reader.load_datasets()
 
 
 if __name__ == "__main__":
