@@ -104,11 +104,9 @@ class DataWriter:
 
 class DataReader:
     def __init__(self, config):
-
-        self.speaker_files = None
-        self.speaker_ids = None
-        self.dataset_files = None
-
+        self.speaker_files = []
+        self.speaker_ids = []
+        self.dataset_files = []
         self.config = config
 
         self.base_path = os.path.join(
@@ -117,7 +115,6 @@ class DataReader:
         self.dataset = self.config[
             "subdataset"
         ]  # For librispeech these are dev-clean, test-clean, etc.
-
         self.datasets = {}
 
     def _parse_function(self, example_proto):
@@ -128,7 +125,6 @@ class DataReader:
                 "mel_spectrogram": tf.io.RaggedFeature(tf.string),
                 "subset": tf.io.FixedLenFeature([], tf.string),
             }
-
         elif self.config["dataset_tf"] == "vctk":
             feature_description = {
                 "id": tf.io.FixedLenFeature([], tf.string),
@@ -137,10 +133,8 @@ class DataReader:
                 "accent": tf.io.FixedLenFeature([], tf.int64),
                 "mel_spectrogram": tf.io.RaggedFeature(tf.string),
             }
-
         else:
             raise NotImplemented
-
         return tf.io.parse_single_example(example_proto, feature_description)
 
     def read_data_set(self, tfrecord_path: str) -> tf.data.TFRecordDataset:
@@ -159,7 +153,9 @@ class DataReader:
 
     def find_speaker_datasets(self) -> None:
         """Find all speaker datasets in dataset directory."""
-        path = os.path.join(self.base_path, self.dataset)
+        path = os.path.join(
+            self.config["bucket_name"], self.base_path
+        )
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith(".tfrecords"):
@@ -180,7 +176,8 @@ class DataReader:
         if self.config["dataset_tf"] == "librispeech":
             # Load the data for each speaker
             for speaker_file, speaker_id in zip(self.speaker_files, self.speaker_ids):
-                self.datasets[speaker_id] = self.read_data_set(speaker_file)
+                dataset = self.read_data_set(speaker_file)
+                self.datasets[speaker_id] = dataset.map(parse_spectrograms)
         elif self.config["dataset_tf"] == "vctk":
             # Load the data per sub dataset
             for dataset_file in self.dataset_files:

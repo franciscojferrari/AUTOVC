@@ -14,7 +14,7 @@ def main(config):
 
     # Read dataset.
     reader = DataReader(config)
-    # reader.load_datasets()
+    reader.load_datasets()
 
 
 if __name__ == "__main__":

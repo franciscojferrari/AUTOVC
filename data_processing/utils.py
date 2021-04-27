@@ -92,10 +92,10 @@ def get_all_files(path: str, extension: str) -> List[str]:
     return file_names
 
 
-def _parse_spectrograms(example: Dict) -> Dict:
+def parse_spectrograms(example: Dict) -> Dict:
     """Convert the serialized tensor back to a tensor."""
     example["mel_spectrogram"] = tf.io.parse_tensor(
-        example["mel_spectrogram"], out_type=tf.float32
+        example["mel_spectrogram"].numpy()[0], out_type=tf.float32
     )
     return example
 
