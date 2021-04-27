@@ -1,99 +1,131 @@
 import tensorflow as tf
-
 from layers import ConvNorm
 
 tfk = tf.keras
 tfkl = tfk.layers
 
 
-class AutoVC(tfk.Model):
-    def __init__(self, name, dim_pre, *args, **kwargs):
-        super(AutoVC).__init__(*args, **kwargs)
-        self.name = name
-
-        self.encoder = self.build_encoder()
-        self.decoder = self.build_decoder()
-        self.postnet = self.build_postnet()
-        self.freq = kwargs.get("freq", 32)
+class Encoder(tfkl.Layer):
+    def __init__(self, name, **kwargs):
+        super(Encoder).__init__(name=name, **kwargs)
+        self.dim_emb = kwargs.get("dim_emb", None)
         self.dim_neck = kwargs.get("dim_neck", None)
+        self.freq = kwargs.get("freq", 32)
+        self.model = self.build_encoder()
+
+    def add_encoder(self):
+        input_layer = tfkl.InputLayer(
+            input_shape=self.dim_emb+80, name="enc_input")
+        _3convs = [ConvNorm(name=f"enc_conv_{i}", filters=512,
+                            kernel_size=5, stride=1, dilation=1, activation="relu") for i in range(3)]
+
+        _2BLSTM = [tfkl.Bidirectional(tfkl.LSTM(name=f"enc_lstm_{i}", units=self.dim_neck, return_sequences=True))
+                   for i in range(2)]
+        encoder = tfk.Sequential([input_layer] + _3convs + _2BLSTM)
+        return encoder
+
+    def call(self, mel_spec, speak_emb):
+        input = tf.concat([mel_spec, speak_emb], axis=1)
+        output = self.model(input)
+
+        output_forward = output[:, :, :self.dim_neck]
+        output_backward = output[:, :, self.dim_neck:]
+
+        # downsampling
+        codes = []
+        for i in range(0, output.shape[1], self.freq):
+            codes.append(tf.concat(
+                [output_forward[:, i, :], output_backward[:, i + self.freq - 1, :]], axis=-1))
+        # TODO: double check if concat or stack
+        codes = tf.concat(codes, axis=-1)
+        return codes
+
+
+class Decoder(tfkl.Layer):
+    def __init__(self, name, **kwargs):
+        super(Decoder).__init__(name=name, **kwargs)
+        self.dim_emb = kwargs.get("dim_emb", None)
         self.dim_pre = kwargs.get("dim_pre", None)
+        self.dim_neck = kwargs.get("dim_neck", None)
+        self.model = self.build_decoder()
+
+    def build_decoder(self):
+        input_layer = tfkl.InputLayer(
+            input_shape=self.dim_neck*2+self.dim_emb, name="dec_input")
+        _3convs = [ConvNorm(name=f"dec_conv_{i}", filters=self.dim_pre,
+                            kernel_size=5, stride=1, dilation=1, activation="relu") for i in range(3)]
+        _3lstms = [
+            tfkl.LSTM(name=f"dec_lstm_{i}", units=1024, return_sequences=True) for i in range(3)]
+        decoder_layers = tfk.Sequential(
+            [input_layer] + _3convs + _3lstms + [tfkl.Dense(80)])
+        return decoder_layers
+
+    def call(self, input):
+        # TODO: double check, we may need to transpose if we first start with LSTM
+        return self.model(input)
+
+
+class PostNet(tfkl.Layer):
+    def __init__(self, name, **kwargs):
+        super(PostNet).__init__(name=name, **kwargs)
+        self.model = self.build_postnet()
+
+    def build_postnet(self):
+        input_layer = tfkl.InputLayer(
+            input_shape=80, name="posnet_input")
+        convs = [ConvNorm(name=f"dec_conv_{i}", filters=512,
+                          kernel_size=5, stride=1, dilation=1, activation="tanh") for i in range(5)]
+
+        convs.append(ConvNorm(name=f"dec_conv_{5}", filters=80,
+                              kernel_size=5, stride=1, dilation=1, activation=None))
+        posnet_layers = tfk.Sequential([input_layer] + convs)
+        return posnet_layers
+
+    def call(self, input):
+        return self.posnet_layers(input)
+
+
+class AutoVC(tfk.Model):
+    def __init__(self, name, *args, **kwargs):
+        super(AutoVC).__init__(name=name, *args, **kwargs)
+        self.dim_emb = kwargs.get("dim_emb", None)
+        self.dim_pre = kwargs.get("dim_pre", None)
+        self.dim_neck = kwargs.get("dim_neck", None)
+        self.freq = kwargs.get("freq", 32)
+        self.lamda = kwargs.get("lamda", 0.01)
+
+
+        self.encoder = Encoder(dim_emb=self.dim_emb,
+                               dim_neck=self.dim_neck, freq=self.freq)
+        self.decoder = Decoder(dim_emb=self.dim_emb,
+                               dim_pre=self.dim_pre, dim_neck=self.dim_neck)
+        self.postnet = PostNet()
 
         # TODO: Check values and throw value exception if are none
 
-    def build_decoder(self):
-        _3convs = [ConvNorm(name = f"dec_conv_{i}", filters = self.dim_pre,
-                            kernel_size = 5, stride = 1, dilation = 1, activation = "relu") for i in range(3)]
-        _3lstms = [
-            tfkl.LSTM(name = f"dec_lstm_{i}", units = 1024, return_sequences = True) for i in range(3)]
-        decoder = tfk.Sequential((_3convs + _3lstms + tfkl.Dense(80)))
-        return decoder
+    def call(self, mel_spec, speak_emb, speak_emb_trg):
 
-    def build_postnet(self):
-        convs = [ConvNorm(name = f"dec_conv_{i}", filters = 512,
-                          kernel_size = 5, stride = 1, dilation = 1, activation = "tanh") for i in range(5)]
+        codes = self.encoder(mel_spec, speak_emb)
+        codes_exp = tfkl.UpSampling1D(size=self.freq)(codes)
 
-        convs.append(ConvNorm(name = f"dec_conv_{5}", filters = 80,
-                              kernel_size = 5, stride = 1, dilation = 1, activation = None))
-        postnet = tfk.Sequential(convs)
-        return postnet
+        encoder_output = tf.concat([codes_exp, speak_emb_trg], axis=-1)
+        mel_output = self.decoder(encoder_output)
 
-    def build_encoder(self):
-        # What about input dimensions?
+        mel_output_postnet = self.postnet(mel_output) + mel_output
 
-        _3convs = [ConvNorm(name = f"enc_conv_{i}", filters = 512,
-                            kernel_size = 5, stride = 1, dilation = 1, activation = "relu") for i in range(3)]
+        custom_loss = self.custom_loss(mel_spec, speak_emb,
+                                mel_output, mel_output_postnet, codes)
 
-        _2BLSTM = [tfkl.Bidirectional(tfkl.LSTM(name = f"enc_lstm_{i}", units = self.dim_neck, return_sequences = True))
-                   for i in range(2)]
-        # TODO: Add input layer if necessary
-        encoder = tfk.Sequential(_3convs + _2BLSTM)
-        return encoder
+        self.add_loss(custom_loss)
 
-    def __call__(self, *args, **kwargs):
-        _X1 = kwargs.get("X1", args[0])  # Freq of speaker 1
-        _S1 = kwargs.get("S1", args[1])  # Embedding of Speaker 1
-        _S2 = kwargs.get("S2", args[2])  # Embedding of Speaker 2 (target)
+        return mel_output, mel_output_postnet, codes
 
-        # _X1 = tf.squeeze(_X1, axis = 1)
-        # _S1 = _S1.expand_dims(_S1, -1)
-        # _S1 = tf.tile() In case that automatic broadcast of dimensions on TF doesn't work
+    def custom_loss(self, x_real, emb_org, x_indentic, x_indentic_psnt, code_real):
 
-        encoder_input = tf.concat([_X1, _S1], axis = 1)
+        loss_id = tfk.losses.MSE(x_real, x_indentic)
+        loss_id_psnt = tfk.losses.MSE(x_real, x_indentic_psnt)
 
-        # TODO: WHEN CALLING THE ENCODER WE NEED TO SQUEEZE AND CONCAT THE 2 INPUTS OF THE BLOCK
-        # Down and Upsample from the encoder
-        encoder_output = self.encoder(encoder_input)
-        encoder_output_forward = encoder_output[:, :, :self.dim_neck]
-        encoder_output_backward = encoder_output[:, :, self.dim_neck:]
+        codes_reconst = self.encoder(x_indentic_psnt, emb_org)
+        loss_cd = tfk.losses.MAE(code_real, codes_reconst)
 
-        _C_forward, _C_backward = [], []
-        for i in range(0, encoder_output.shape[1], self.freq):
-            _C_forward.append(encoder_output_forward[:, i, :])
-            _C_backward.append(encoder_output_backward[:, i + self.freq - 1, :])
-            # codes.append(torch.cat((out_forward[:, i + self.freq - 1, :], out_backward[:, i, :]), dim = -1))
-
-        _C_forward = tf.stack(_C_forward, axis = 1)
-        _C_backward = tf.stack(_C_backward, axis = 1)
-
-        _C_forward_UP = tfkl.UpSampling1D(size = self.freq)(_C_forward)
-        _C_backward_UP = tfkl.UpSampling1D(size = self.freq)(_C_backward)
-
-        # Decoder
-        decoder_input = tf.concat([_C_forward_UP, _C_backward_UP, _S1], axis = -1)
-        mel_output = self.decoder(decoder_input)
-
-        mel_output_postnet = self.postnet(mel_output)
-
-        mel_output_sum = mel_output + mel_output_postnet
-
-        return mel_output_sum, mel_output_postnet, (_C_forward, _C_backward)
-
-    def loss_function(self, *args, **kwargs):
-        x_real = kwargs.get("X1", args[0])
-
-        mel_output_sum = kwargs.get("mel_output_sum", args[1])
-        mel_output_postnet = kwargs.get("mel_output_postnet", args[2])
-        _C_forward, _C_backward = kwargs.get("codes", args[3])
-
-        autovc_loss_id = tfk.losses.MSE(x_real, mel_output_sum)
-        autovc_loss_id_psnt = tfk.losses.MSE(x_real, mel_output_postnet)
+        return loss_id + loss_id_psnt + self.lamda*loss_cd
