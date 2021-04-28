@@ -100,6 +100,13 @@ def parse_spectrograms(example: Dict) -> Dict:
     return example
 
 
+def parse_spectrograms_vctk(example: Dict) -> Dict:
+    example["speech"] = tf.io.parse_tensor(
+        example["speech"].numpy()[0], out_type=tf.float32
+    )
+    return example
+
+
 def raw_audio_to_spectrogram(speech_tensor: tf.Tensor, config: Dict) -> tf.Tensor:
     spectrogram = tfio.experimental.audio.spectrogram(
         speech_tensor,

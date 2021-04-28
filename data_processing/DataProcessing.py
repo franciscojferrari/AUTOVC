@@ -133,7 +133,7 @@ class DataReader:
                 "speaker": tf.io.FixedLenFeature([], tf.int64),
                 "gender": tf.io.FixedLenFeature([], tf.int64),
                 "accent": tf.io.FixedLenFeature([], tf.int64),
-                "mel_spectrogram": tf.io.RaggedFeature(tf.string),
+                "speech": tf.io.RaggedFeature(tf.string),
             }
         else:
             raise NotImplemented
@@ -147,15 +147,19 @@ class DataReader:
 
     def find_vctk_datasets(self):
         """Find all vctk datasets in dataset directory."""
-        path = os.path.join(self.base_path, self.dataset)
+        path = os.path.join(
+            self.config["bucket_name"], self.base_path
+        )
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith("00512"):
-                    self.speaker_files.append(os.path.join(root, file))
+                    self.dataset_files.append(os.path.join(root, file))
 
     def find_speaker_datasets(self) -> None:
         """Find all speaker datasets in dataset directory."""
-        path = os.path.join(self.config["bucket_name"], self.base_path)
+        path = os.path.join(
+            self.config["bucket_name"], self.base_path
+        )
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith(".tfrecords"):
@@ -176,8 +180,7 @@ class DataReader:
         if self.config["dataset_tf"] == "librispeech":
             # Load the data for each speaker
             for speaker_file, speaker_id in zip(self.speaker_files, self.speaker_ids):
-                dataset = self.read_data_set(speaker_file)
-                self.datasets[speaker_id] = dataset.map(parse_spectrograms)
+                self.datasets[speaker_id] = self.read_data_set(speaker_file)
         elif self.config["dataset_tf"] == "vctk":
             # Load the data per sub dataset
             for dataset_file in self.dataset_files:
