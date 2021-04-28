@@ -58,7 +58,7 @@ def spectrogram_example_vctk(example: tf.train.Example) -> tf.train.Example:
         "id": _bytes_feature(example["id"]),
         "speaker": _int64_feature(example["speaker"]),
         "gender": _int64_feature(example["gender"]),
-        "accent": _int64_feature("accent"),
+        "accent": _int64_feature(example["accent"]),
         "speech": _bytes_feature(serialized_tensor),
     }
 

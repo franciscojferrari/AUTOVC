@@ -64,7 +64,9 @@ class DataWriter:
                 write_path = (
                     f"{self.bucket_path}/processed_datasets/{self.config['dataset_tf']}"
                 )
-                record_file = os.path.join(write_path, vctk_file)
+                file_nm = vctk_file.split(".")[-1]
+                print(file_nm)
+                record_file = os.path.join(write_path, file_nm)
 
                 with tf.io.TFRecordWriter(record_file) as writer:
                     for example in processed:
@@ -153,9 +155,7 @@ class DataReader:
 
     def find_speaker_datasets(self) -> None:
         """Find all speaker datasets in dataset directory."""
-        path = os.path.join(
-            self.config["bucket_name"], self.base_path
-        )
+        path = os.path.join(self.config["bucket_name"], self.base_path)
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith(".tfrecords"):
