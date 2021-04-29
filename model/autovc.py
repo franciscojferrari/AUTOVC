@@ -27,24 +27,23 @@ class Encoder(tfkl.Layer):
         mel_spec = self.masking(mel_spec)
         mel_spec = tf.transpose(mel_spec, [0, 2, 1])
         speak_emb = tf.broadcast_to(
-            speak_emb, [speak_emb.shape[0], speak_emb.shape[1], mel_spec.shape[-1]])
+            tf.expand_dims(speak_emb, axis=-1), [speak_emb.shape[0], speak_emb.shape[1], mel_spec.shape[-1]])
         input = tf.concat([mel_spec, speak_emb], axis=1)
 
         conv_output = self.convs(input)
-        conv_output = tf.transpose(conv_output, [0, 1, 2])
+        conv_output = tf.transpose(conv_output, [0, 2, 1])
         
         output = self.lstms(conv_output)
 
         output_forward = output[:, :, :self.dim_neck]
         output_backward = output[:, :, self.dim_neck:]
-
+        print(output.shape)
         # downsampling
         codes = []
-        for i in range(0, output.shape[1] - self.freq, self.freq):
+        for i in range(0, output.shape[1], self.freq):
             codes.append(tf.concat(
                 [output_forward[:, i, :], output_backward[:, i + self.freq - 1, :]], axis=-1))
-        # TODO: double check if concat or stack
-        codes = tf.concat(codes, axis=-1)
+        
         return codes
 
 
@@ -91,7 +90,7 @@ class PostNet(tfkl.Layer):
         return posnet_layers
 
     def call(self, input):
-        return self.posnet_layers(input)
+        return self.model(input)
 
 
 class AutoVC(tfk.Model):
@@ -117,19 +116,29 @@ class AutoVC(tfk.Model):
 
     def call(self, mel_spec, speak_emb, speak_emb_trg):
         codes = self.encoder(mel_spec, speak_emb)
-        codes_exp = tfkl.UpSampling1D(size=self.freq)(codes)
+
+        tmp = []
+        for code in codes:
+            tmp.append(tf.broadcast_to(
+                tf.expand_dims(code, axis=1), [code.shape[0], mel_spec.shape[1]//len(codes), code.shape[1]]))
+        codes_exp = tf.concat(tmp, axis=1)
+
+        speak_emb_trg = tf.broadcast_to(
+            tf.expand_dims(speak_emb_trg, axis=1), [speak_emb_trg.shape[0], mel_spec.shape[1], speak_emb_trg.shape[1]])
 
         encoder_output = tf.concat([codes_exp, speak_emb_trg], axis=-1)
         mel_output = self.decoder(encoder_output)
 
-        mel_output_postnet = self.postnet(mel_output) + mel_output
+        mel_output_postnet = self.postnet(tf.transpose(mel_output, [0, 2, 1]))
+        mel_output_postnet = mel_output + \
+            tf.transpose(mel_output_postnet, [0, 2, 1])
 
         custom_loss = self.custom_loss(mel_spec, speak_emb,
-                                       mel_output, mel_output_postnet, codes)
+                                       mel_output, mel_output_postnet, tf.concat(codes, axis=-1))
 
         self.add_loss(custom_loss)
 
-        return mel_output, mel_output_postnet, codes
+        return mel_output, mel_output_postnet, tf.concat(codes, axis=-1)
 
     def custom_loss(self, x_real, speak_emb, mel_output, mel_output_postnet, code_real):
         """
@@ -144,6 +153,7 @@ class AutoVC(tfk.Model):
         loss_id_psnt = tfk.losses.MSE(x_real, mel_output_postnet)
 
         codes_reconst = self.encoder(mel_output_postnet, speak_emb)
+        codes_reconst = tf.concat(codes_reconst, axis=-1)
 
         loss_cd = tfk.losses.MAE(code_real, codes_reconst)
 
