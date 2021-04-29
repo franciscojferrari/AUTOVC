@@ -7,8 +7,8 @@ tfkl = tfk.layers
 
 
 class Encoder(tfkl.Layer):
-    def __init__(self, name, **kwargs):
-        super(Encoder).__init__(name = name, **kwargs)
+    def __init__(self, name="encoder", **kwargs):
+        super(Encoder, self).__init__(name=name)
         self.mel_feature_dim = kwargs.get("mel_dim", 80)
         self.dim_emb = kwargs.get("dim_emb", None)
         self.dim_neck = kwargs.get("dim_neck", None)
@@ -16,15 +16,15 @@ class Encoder(tfkl.Layer):
         self.model = self.build_encoder()
         # TODO: Assert values
 
-    def add_encoder(self):
-        input_layer = tfkl.InputLayer(
-            input_shape = self.dim_emb + self.mel_feature_dim, name = "enc_input")
+    def build_encoder(self):
+        # input_layer = tfkl.InputLayer(
+        #     input_shape = self.dim_emb + self.mel_feature_dim, name = "enc_input")
         _3convs = [ConvNorm(name = f"enc_conv_{i}", filters = 512,
-                            kernel_size = 5, stride = 1, dilation = 1, activation = "relu") for i in range(3)]
+                            kernel_size=5, strides=1, dilation_rate=1, activation="relu") for i in range(3)]
 
         _2BLSTM = [tfkl.Bidirectional(tfkl.LSTM(name = f"enc_lstm_{i}", units = self.dim_neck, return_sequences = True))
                    for i in range(2)]
-        encoder = tfk.Sequential([input_layer] + _3convs + _2BLSTM)
+        encoder = tfk.Sequential(_3convs + _2BLSTM)
         return encoder
 
     def call(self, mel_spec, speak_emb):
@@ -45,8 +45,8 @@ class Encoder(tfkl.Layer):
 
 
 class Decoder(tfkl.Layer):
-    def __init__(self, name, **kwargs):
-        super(Decoder).__init__(name = name, **kwargs)
+    def __init__(self, name="decoder", **kwargs):
+        super(Decoder, self).__init__(name=name)
         self.dim_emb = kwargs.get("dim_emb", None)
         self.dim_pre = kwargs.get("dim_pre", None)
         self.dim_neck = kwargs.get("dim_neck", None)
@@ -54,14 +54,14 @@ class Decoder(tfkl.Layer):
         self.model = self.build_decoder()
 
     def build_decoder(self):
-        input_layer = tfkl.InputLayer(
-            input_shape = self.dim_neck * 2 + self.dim_emb, name = "dec_input")
+        # input_layer = tfkl.InputLayer(
+        #     input_shape = self.dim_neck * 2 + self.dim_emb, name = "dec_input")
         _3convs = [ConvNorm(name = f"dec_conv_{i}", filters = self.dim_pre,
-                            kernel_size = 5, stride = 1, dilation = 1, activation = "relu") for i in range(3)]
+                            kernel_size=5, strides=1, dilation_rate=1, activation="relu") for i in range(3)]
         _3lstms = [
             tfkl.LSTM(name = f"dec_lstm_{i}", units = 1024, return_sequences = True) for i in range(3)]
         decoder_layers = tfk.Sequential(
-            [input_layer] + _3convs + _3lstms + [tfkl.Dense(self.mel_feature_dim)])
+             _3convs + _3lstms + [tfkl.Dense(self.mel_feature_dim)])
         return decoder_layers
 
     def call(self, input):
@@ -70,20 +70,20 @@ class Decoder(tfkl.Layer):
 
 
 class PostNet(tfkl.Layer):
-    def __init__(self, name, **kwargs):
-        super(PostNet).__init__(name = name, **kwargs)
-        self.model = self.build_postnet()
+    def __init__(self, name="postnet", **kwargs):
+        super(PostNet, self).__init__(name=name)
         self.mel_feature_dim = kwargs.get("mel_dim", 80)
+        self.model = self.build_postnet()
 
     def build_postnet(self):
-        input_layer = tfkl.InputLayer(
-            input_shape = self.mel_feature_dim, name = "posnet_input")
+        # input_layer = tfkl.InputLayer(
+        #     input_shape = self.mel_feature_dim, name = "posnet_input")
         convs = [ConvNorm(name = f"dec_conv_{i}", filters = 512,
-                          kernel_size = 5, stride = 1, dilation = 1, activation = "tanh") for i in range(5)]
+                          kernel_size=5, strides=1, dilation_rate=1, activation="tanh") for i in range(5)]
 
         convs.append(ConvNorm(name = f"dec_conv_{5}", filters = self.mel_feature_dim,
-                              kernel_size = 5, stride = 1, dilation = 1, activation = None))
-        posnet_layers = tfk.Sequential([input_layer] + convs)
+                              kernel_size=5, strides=1, dilation_rate=1, activation=None))
+        posnet_layers = tfk.Sequential(convs)
         return posnet_layers
 
     def call(self, input):
@@ -91,14 +91,14 @@ class PostNet(tfkl.Layer):
 
 
 class AutoVC(tfk.Model):
-    def __init__(self, name, *args, **kwargs):
-        super(AutoVC).__init__(name = name, *args, **kwargs)
+    def __init__(self, name="AutoVC", *args, **kwargs):
+        super(AutoVC, self).__init__(name=name)
         self.dim_emb = kwargs.get("dim_emb", None)
         self.dim_pre = kwargs.get("dim_pre", None)
         self.dim_neck = kwargs.get("dim_neck", None)
+        self.mel_feature_dim = kwargs.get("mel_dim", 80)
         self.freq = kwargs.get("freq", 32)
         self.lamda = kwargs.get("lamda", 0.01)
-        self.mel_feature_dim = kwargs.get("mel_dim", 80)
 
         self.encoder = Encoder(dim_emb = self.dim_emb,
                                dim_neck = self.dim_neck, freq = self.freq,
