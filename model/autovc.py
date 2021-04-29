@@ -7,24 +7,24 @@ tfkl = tfk.layers
 
 
 class Encoder(tfkl.Layer):
-    def __init__(self, name="encoder", **kwargs):
+    def __init__(self, name="encoder", time_dim=128, **kwargs):
         super(Encoder, self).__init__(name=name)
         self.mel_feature_dim = kwargs.get("mel_dim", 80)
         self.dim_emb = kwargs.get("dim_emb", None)
         self.dim_neck = kwargs.get("dim_neck", None)
         self.freq = kwargs.get("freq", 32)
-        self.model = self.build_encoder()
+        self.model = self.build_encoder(time_dim)
         # TODO: Assert values
 
-    def build_encoder(self):
-        # input_layer = tfkl.InputLayer(
-        #     input_shape = self.dim_emb + self.mel_feature_dim, name = "enc_input")
+    def build_encoder(self, time_dim):
+        masking = tfkl.Masking(
+            mask_value=-1.0, input_shape=(time_dim, self.dim_emb + self.mel_feature_dim))
         _3convs = [ConvNorm(name = f"enc_conv_{i}", filters = 512,
                             kernel_size=5, strides=1, dilation_rate=1, activation="relu") for i in range(3)]
 
         _2BLSTM = [tfkl.Bidirectional(tfkl.LSTM(name = f"enc_lstm_{i}", units = self.dim_neck, return_sequences = True))
                    for i in range(2)]
-        encoder = tfk.Sequential(_3convs + _2BLSTM)
+        encoder = tfk.Sequential([masking] + _3convs + _2BLSTM)
         return encoder
 
     def call(self, mel_spec, speak_emb):
