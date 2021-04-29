@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import random
 
 def speaker_centroids(embeddings):
     """
@@ -81,3 +82,23 @@ def calculate_loss(sim_matrix):
     neg = np.log(np.sum(in_neg,axis=2)+ 1e-6)
     per_embedding_loss = -1 * (pos - neg)
     return per_embedding_loss.sum()
+
+def parse_spectrograms(example):
+    """Convert the serialized tensor back to a tensor."""
+    example = tf.io.parse_tensor(
+        example.numpy()[0], out_type=tf.float32
+    )
+    return example
+
+def create_batches(datasets, number_speakers, number_utterances):
+  list_speakers = random.sample(datasets.keys(),number_speakers)
+  batch = []
+  for speaker in list_speakers:
+      print(speaker)
+      list_utterances = datasets[speaker].shuffle(buffer_size=100).batch(number_utterances)
+      batch_speaker = next(iter(list_utterances))
+      for i in batch_speaker["mel_spectrogram"]:
+        spectrogram = parse_spectrograms(i)
+        batch.append(spectrogram)
+  batch = tf.ragged.stack(batch, axis=0)
+  return batch
