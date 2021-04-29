@@ -10,7 +10,7 @@ import keras.backend as K
 
 
 
-class SpeechEmbedder(keras.layers.Layer):
+class SpeechEmbedder(keras.Model):
     def __init__(self, time_dim=13, melfilters_dim=32):
         super(SpeechEmbedder, self).__init__()
         self.model = Sequential()
@@ -26,7 +26,7 @@ class SpeechEmbedder(keras.layers.Layer):
         self.model.add(Lambda(lambda x: K.l2_normalize(x ,axis=1)))
 
     def call(self, inputs):
-        return self.model.predict(inputs)
+        return self.model(inputs)
 
 
 class GE2ELoss(keras.layers.Layer):
