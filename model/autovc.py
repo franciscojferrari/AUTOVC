@@ -14,8 +14,8 @@ class Encoder(tfkl.Layer):
         self.dim_neck = kwargs.get("dim_neck", None)
         self.freq = kwargs.get("freq", 32)
 
-        self.masking = tfkl.Masking(
-            mask_value=-1.0, input_shape=(time_dim, self.mel_feature_dim))
+        # self.masking = tfkl.Masking(
+        #     mask_value=-1.0, input_shape=(time_dim, self.mel_feature_dim))
 
         self.convs = tfk.Sequential([ConvNorm(name=f"enc_conv_{i}", filters=512,
                                               kernel_size=5, strides=1, dilation_rate=1, activation="relu") for i in range(3)])
@@ -24,7 +24,7 @@ class Encoder(tfkl.Layer):
         # TODO: Assert values
 
     def call(self, mel_spec, speak_emb):
-        mel_spec = self.masking(mel_spec)
+        # mel_spec = self.masking(mel_spec)
         mel_spec = tf.transpose(mel_spec, [0, 2, 1])
         speak_emb = tf.broadcast_to(
             tf.expand_dims(speak_emb, axis=-1), [speak_emb.shape[0], speak_emb.shape[1], mel_spec.shape[-1]])
@@ -37,7 +37,6 @@ class Encoder(tfkl.Layer):
 
         output_forward = output[:, :, :self.dim_neck]
         output_backward = output[:, :, self.dim_neck:]
-        print(output.shape)
         # downsampling
         codes = []
         for i in range(0, output.shape[1], self.freq):
@@ -79,8 +78,6 @@ class PostNet(tfkl.Layer):
         self.model = self.build_postnet()
 
     def build_postnet(self):
-        # input_layer = tfkl.InputLayer(
-        #     input_shape = self.mel_feature_dim, name = "posnet_input")
         convs = [ConvNorm(name=f"dec_conv_{i}", filters=512,
                           kernel_size=5, strides=1, dilation_rate=1, activation="tanh") for i in range(5)]
 
@@ -90,6 +87,7 @@ class PostNet(tfkl.Layer):
         return posnet_layers
 
     def call(self, input):
+        print("IN", input.shape)
         return self.model(input)
 
 
@@ -128,10 +126,10 @@ class AutoVC(tfk.Model):
 
         encoder_output = tf.concat([codes_exp, speak_emb_trg], axis=-1)
         mel_output = self.decoder(encoder_output)
-
-        mel_output_postnet = self.postnet(tf.transpose(mel_output, [0, 2, 1]))
-        mel_output_postnet = mel_output + \
-            tf.transpose(mel_output_postnet, [0, 2, 1])
+        print("RECON", mel_output.shape)
+        mel_output_postnet = self.postnet(mel_output)
+        print("PSTNET", mel_output_postnet.shape)
+        mel_output_postnet = mel_output + mel_output_postnet
 
         custom_loss = self.custom_loss(mel_spec, speak_emb,
                                        mel_output, mel_output_postnet, tf.concat(codes, axis=-1))
@@ -149,6 +147,7 @@ class AutoVC(tfk.Model):
             Content Loss (semantic loss)
                 Reconstruction error between bottle neck and reconstructed bottle neck
         """
+        print("ID", x_real.shape, mel_output.shape)
         loss_id = tfk.losses.MSE(x_real, mel_output)
         loss_id_psnt = tfk.losses.MSE(x_real, mel_output_postnet)
 
