@@ -87,7 +87,6 @@ class PostNet(tfkl.Layer):
         return posnet_layers
 
     def call(self, input):
-        print("IN", input.shape)
         return self.model(input)
 
 
@@ -126,9 +125,7 @@ class AutoVC(tfk.Model):
 
         encoder_output = tf.concat([codes_exp, speak_emb_trg], axis=-1)
         mel_output = self.decoder(encoder_output)
-        print("RECON", mel_output.shape)
         mel_output_postnet = self.postnet(mel_output)
-        print("PSTNET", mel_output_postnet.shape)
         mel_output_postnet = mel_output + mel_output_postnet
 
         custom_loss = self.custom_loss(mel_spec, speak_emb,
@@ -147,13 +144,11 @@ class AutoVC(tfk.Model):
             Content Loss (semantic loss)
                 Reconstruction error between bottle neck and reconstructed bottle neck
         """
-        print("ID", x_real.shape, mel_output.shape)
         loss_id = tfk.losses.MSE(x_real, mel_output)
         loss_id_psnt = tfk.losses.MSE(x_real, mel_output_postnet)
 
         codes_reconst = self.encoder(mel_output_postnet, speak_emb)
         codes_reconst = tf.concat(codes_reconst, axis=-1)
-
         loss_cd = tfk.losses.MAE(code_real, codes_reconst)
-
+        loss_cd = tf.expand_dims(loss_cd, axis=-1)
         return loss_id + loss_id_psnt + self.lamda * loss_cd
