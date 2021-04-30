@@ -27,9 +27,11 @@ class Encoder(tfkl.Layer):
 
     def call(self, mel_spec, speak_emb):
         # mel_spec = self.masking(mel_spec)
+        batch_size = tf.shape(speak_emb)[0]
+
         mel_spec = tf.transpose(mel_spec, [0, 2, 1])
         speak_emb = tf.broadcast_to(
-            tf.expand_dims(speak_emb, axis = -1), [speak_emb.shape[0], speak_emb.shape[1], mel_spec.shape[-1]])
+            tf.expand_dims(speak_emb, axis = -1), [batch_size, self.dim_emb, mel_spec.shape[-1]])
         input = tf.concat([mel_spec, speak_emb], axis = 1)
 
         conv_output = self.convs(input)
@@ -113,32 +115,42 @@ class AutoVC(tfk.Model):
 
         # TODO: Check values and throw value exception if are none
 
-    def call(self, mel_spec, speak_emb, speak_emb_trg):
+    # def call(self, mel_spec, speak_emb, speak_emb_trg):
+    def call(self, inputs, *args, **kwargs):
+        mel_spec, speak_emb, speak_emb_trg = inputs
+
+        # speak_emb = kwargs.get("", args[0] if args else None)
+        # speak_emb_trg = kwargs.get("", args[0] if args else None)
+
         codes = self.encoder(mel_spec, speak_emb)
 
         tmp = []
         for code in codes:
+            batch_size = tf.shape(code)[0]
+            time_seq = tf.shape(mel_spec)[1]
+            down_size = tf.shape(code)[1]
             tmp.append(tf.broadcast_to(
-                tf.expand_dims(code, axis = 1), [code.shape[0], mel_spec.shape[1] // len(codes), code.shape[1]]))
+                tf.expand_dims(code, axis = 1), [batch_size, time_seq // len(codes), down_size]))
         codes_exp = tf.concat(tmp, axis = 1)
 
         speak_emb_trg = tf.broadcast_to(
             tf.expand_dims(speak_emb_trg, axis = 1),
-            [speak_emb_trg.shape[0], mel_spec.shape[1], speak_emb_trg.shape[1]])
+            [tf.shape(speak_emb_trg)[0], mel_spec.shape[1], speak_emb_trg.shape[1]])
 
         encoder_output = tf.concat([codes_exp, speak_emb_trg], axis = -1)
         mel_output = self.decoder(encoder_output)
         mel_output_postnet = self.postnet(mel_output)
         mel_output_postnet = mel_output + mel_output_postnet
 
-        custom_loss = self.custom_loss(mel_spec, speak_emb,
-                                       mel_output, mel_output_postnet, tf.concat(codes, axis = -1))
+        # custom_loss = self.custom_loss(mel_spec, speak_emb,
+        #                                mel_output, mel_output_postnet, tf.concat(codes, axis = -1))
 
-        self.add_loss(custom_loss)
+        # self.add_loss(custom_loss)
 
         return mel_output, mel_output_postnet, tf.concat(codes, axis = -1)
 
-    def custom_loss(self, x_real, speak_emb, mel_output, mel_output_postnet, code_real):
+    # def custom_loss(self, x_real, speak_emb, mel_output, mel_output_postnet, code_real):
+    def custom_loss(self, y_true, y_pred):
         """
         First bit:
             Identity mapping loss
@@ -147,6 +159,9 @@ class AutoVC(tfk.Model):
             Content Loss (semantic loss)
                 Reconstruction error between bottle neck and reconstructed bottle neck
         """
+        x_real, speak_emb = y_true
+        mel_output, mel_output_postnet, code_real = y_pred
+
         loss_id = tfk.losses.MSE(x_real, mel_output)
         loss_id_psnt = tfk.losses.MSE(x_real, mel_output_postnet)
 
