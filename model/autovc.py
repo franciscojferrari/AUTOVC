@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from .layers import ConvNorm
+from layers import ConvNorm
 
 tfk = tf.keras
 tfkl = tfk.layers
@@ -14,9 +14,6 @@ class Encoder(tfkl.Layer):
         self.dim_neck = kwargs.get("dim_neck", None)
         self.freq = kwargs.get("freq", 32)
 
-        # self.masking = tfkl.Masking(
-        #     mask_value=-1.0, input_shape=(time_dim, self.mel_feature_dim))
-
         self.convs = tfk.Sequential([ConvNorm(name = f"enc_conv_{i}", filters = 512,
                                               kernel_size = 5, strides = 1, dilation_rate = 1, activation = "relu") for
                                      i in range(3)])
@@ -26,9 +23,8 @@ class Encoder(tfkl.Layer):
         # TODO: Assert values
 
     def call(self, mel_spec, speak_emb):
-        # mel_spec = self.masking(mel_spec)
+        
         batch_size = tf.shape(speak_emb)[0]
-
         mel_spec = tf.transpose(mel_spec, [0, 2, 1])
         speak_emb = tf.broadcast_to(
             tf.expand_dims(speak_emb, axis = -1), [batch_size, self.dim_emb, mel_spec.shape[-1]])
@@ -60,8 +56,6 @@ class Decoder(tfkl.Layer):
         self.model = self.build_decoder()
 
     def build_decoder(self):
-        # input_layer = tfkl.InputLayer(
-        #     input_shape = self.dim_neck * 2 + self.dim_emb, name = "dec_input")
         _3convs = [ConvNorm(name = f"dec_conv_{i}", filters = self.dim_pre,
                             kernel_size = 5, strides = 1, dilation_rate = 1, activation = "relu") for i in range(3)]
         _3lstms = [
@@ -115,22 +109,21 @@ class AutoVC(tfk.Model):
 
         # TODO: Check values and throw value exception if are none
 
-    # def call(self, mel_spec, speak_emb, speak_emb_trg):
     def call(self, inputs, *args, **kwargs):
         mel_spec, speak_emb, speak_emb_trg = inputs
-
-        # speak_emb = kwargs.get("", args[0] if args else None)
-        # speak_emb_trg = kwargs.get("", args[0] if args else None)
 
         codes = self.encoder(mel_spec, speak_emb)
 
         tmp = []
         for code in codes:
+            
             batch_size = tf.shape(code)[0]
             time_seq = tf.shape(mel_spec)[1]
             down_size = tf.shape(code)[1]
+
             tmp.append(tf.broadcast_to(
                 tf.expand_dims(code, axis = 1), [batch_size, time_seq // len(codes), down_size]))
+
         codes_exp = tf.concat(tmp, axis = 1)
 
         speak_emb_trg = tf.broadcast_to(
@@ -142,31 +135,30 @@ class AutoVC(tfk.Model):
         mel_output_postnet = self.postnet(mel_output)
         mel_output_postnet = mel_output + mel_output_postnet
 
-        # custom_loss = self.custom_loss(mel_spec, speak_emb,
-        #                                mel_output, mel_output_postnet, tf.concat(codes, axis = -1))
+        bottleneck_loss = self.bottleneck_loss(mel_output_postnet, speak_emb, tf.concat(codes, axis = -1))
 
-        # self.add_loss(custom_loss)
+        self.add_loss(bottleneck_loss)
 
-        return mel_output, mel_output_postnet, tf.concat(codes, axis = -1)
+        return mel_output, mel_output_postnet
 
     # def custom_loss(self, x_real, speak_emb, mel_output, mel_output_postnet, code_real):
-    def custom_loss(self, y_true, y_pred):
-        """
-        First bit:
-            Identity mapping loss
-                Reconstruction error between mel input and mel output (Before post net--> Why? No clear reason why. It just improves the results)
-                Reconstruction error between mel input and final output (post net)
-            Content Loss (semantic loss)
-                Reconstruction error between bottle neck and reconstructed bottle neck
-        """
-        x_real, speak_emb = y_true
-        mel_output, mel_output_postnet, code_real = y_pred
-
-        loss_id = tfk.losses.MSE(x_real, mel_output)
-        loss_id_psnt = tfk.losses.MSE(x_real, mel_output_postnet)
+    def bottleneck_loss(self, mel_output_postnet, speak_emb, code_real):
 
         codes_reconst = self.encoder(mel_output_postnet, speak_emb)
         codes_reconst = tf.concat(codes_reconst, axis = -1)
         loss_cd = tfk.losses.MAE(code_real, codes_reconst)
         loss_cd = tf.expand_dims(loss_cd, axis = -1)
-        return loss_id + loss_id_psnt + self.lamda * loss_cd
+        return self.lamda * loss_cd
+
+    @staticmethod
+    def reconstruction_loss(y_true, y_pred):
+        print("y_pred",y_pred.shape)
+        print("y_true", y_true.shape)
+
+        x_real = y_true[0]
+        mel_output = y_pred[0]
+        mel_output_postnet= y_pred[1]
+
+        loss_id = tfk.losses.MSE(x_real, mel_output)
+        loss_id_psnt = tfk.losses.MSE(x_real, mel_output_postnet)
+        return loss_id + loss_id_psnt
