@@ -7,8 +7,8 @@ tfkl = tfk.layers
 
 
 class Encoder(tfkl.Layer):
-    def __init__(self, dim_emb=256, dim_neck=16, freq=32,*args, ** kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, name="encoder", dim_emb=256, dim_neck=16, freq=32, *args, ** kwargs):
+        super().__init__(name=name, *args, **kwargs)
         self.dim_emb = dim_emb
         self.dim_neck = dim_neck
         self.freq = freq
@@ -16,9 +16,9 @@ class Encoder(tfkl.Layer):
     def build(self, input_shape):
         self.convs = [ConvNorm(name=f"enc_conv_{i}", filters=512,
                                kernel_size=5, strides=1, dilation_rate=1, activation="relu") for
-                      i in range(3)]
+                      i in tf.range(3)]
         self.lstms = [tfkl.Bidirectional(tfkl.LSTM(name=f"enc_lstm_{i}", units=self.dim_neck, return_sequences=True))
-                      for i in range(2)]
+                      for i in tf.range(2)]
 
     def call(self, mel_spec, speak_emb):
 
@@ -28,45 +28,44 @@ class Encoder(tfkl.Layer):
             tf.expand_dims(speak_emb, axis=-1), [batch_size, self.dim_emb, mel_spec.shape[-1]])
         input = tf.concat([mel_spec, speak_emb], axis=1)
 
-        conv_output = input
-        for conv in self.convs:
-            conv_output = conv(conv_output)
+        conv_output = self.convs[0](input)
+        conv_output = self.convs[1](conv_output)
+        conv_output = self.convs[2](conv_output)
 
         conv_output = tf.transpose(conv_output, [0, 2, 1])
 
-        output = conv_output
-        for lstm in self.lstms:
-            output = lstm(output)
+        output = self.lstms[0](conv_output)
+        output = self.lstms[1](output)
 
         output_forward = output[:, :, :self.dim_neck]
         output_backward = output[:, :, self.dim_neck:]
 
-        mask_forward = tf.equal(tf.range(tf.shape(output_forward)[1]) % self.freq, 0)
-        mask_backward = tf.equal(tf.range(tf.shape(output_forward)[1]-self.freq + 1) % self.freq, 0)
+        mask_forward = tf.equal(
+            tf.range(tf.shape(output_forward)[1]) % self.freq, 0)
+        mask_backward = tf.equal(tf.range(tf.shape(output_forward)[
+                                 1]-self.freq + 1) % self.freq, 0)
         output_forward_down = tf.boolean_mask(
             output_forward, mask_forward, axis=1)
         output_backward_down = tf.boolean_mask(
             output_backward[:, self.freq-1:, :], mask_backward, axis=1)
 
         codes = tf.concat([output_forward_down, output_backward_down], axis=-1)
-        
+
         return codes
 
 
 class UpSampling(tfkl.Layer):
-    def __init__(self, *args, dim_neck=16, time_dim=128, dim_emb=256, ** kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, name="upsampling", *args, dim_neck=16, time_dim=128, dim_emb=256, ** kwargs):
+        super().__init__(name=name, *args, **kwargs)
         self.dim_neck = dim_neck
         self.time_dim = time_dim
         self.dim_emb = dim_emb
 
     def build(self, input_shape):
-        self.up_sampling = tf.keras.layers.UpSampling1D(
-            self.time_dim // self.dim_neck)
+        self.up_sampling = tf.keras.layers.UpSampling1D(name="upsampling", size=self.time_dim // self.dim_neck)
 
-    @tf.function
     def call(self, codes, trg_emb):
-    
+
         up_codes = self.up_sampling(codes)
         batch_size = tf.shape(trg_emb)[0]
         trg_emb = tf.broadcast_to(
@@ -78,49 +77,52 @@ class UpSampling(tfkl.Layer):
 
 
 class Decoder(tfkl.Layer):
-    def __init__(self, *args, dim_pre =512, mel_dim=80,** kwargs):
+    def __init__(self, name="decoder", *args, dim_pre=512, mel_dim=80, ** kwargs):
         super().__init__(*args, **kwargs)
         self.dim_pre = dim_pre
         self.mel_dim = mel_dim
 
     def build(self, input_shape):
         self.convs = [ConvNorm(name=f"dec_conv_{i}", filters=self.dim_pre,
-                               kernel_size=5, strides=1, dilation_rate=1, activation="relu") for i in range(3)]
+                               kernel_size=5, strides=1, dilation_rate=1, activation="relu") for i in tf.range(3)]
         self.lstms = [
-            tfkl.LSTM(name=f"dec_lstm_{i}", units=1024, return_sequences=True) for i in range(3)]
+            tfkl.LSTM(name=f"dec_lstm_{i}", units=1024, return_sequences=True) for i in tf.range(3)]
         self.conv1 = tfkl.Dense(self.mel_dim)
 
     def call(self, codes):
-        recon_conv = codes
-        for conv in self.convs:
-            recon_conv = conv(recon_conv)
 
-        recon_lstm = recon_conv
-        for lstm in self.lstms:
-            recon_lstm = lstm(recon_lstm)
+        recon_conv = self.convs[0](codes)
+        recon_conv = self.convs[1](recon_conv)
+        recon_conv = self.convs[2](recon_conv)
+
+        recon_lstm = self.lstms[0](recon_conv)
+        recon_lstm = self.lstms[1](recon_lstm)
+        recon_lstm = self.lstms[2](recon_lstm)
 
         recon = self.conv1(recon_lstm)
         return recon
 
 
 class PostNet(tfkl.Layer):
-    def __init__(self, *args, mel_dim=80, ** kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, name="postnet", *args, mel_dim=80, ** kwargs):
+        super().__init__(name=name, *args, **kwargs)
         self.mel_dim = mel_dim
 
-    def build(self, input):
+    def build(self, input_shape):
         self.convs = [ConvNorm(name=f"dec_conv_{i}", filters=512,
-                               kernel_size=5, strides=1, dilation_rate=1, activation="tanh") for i in range(5)]
+                               kernel_size=5, strides=1, dilation_rate=1, activation="tanh") for i in tf.range(5)]
 
         self.convs.append(ConvNorm(name=f"dec_conv_{5}", filters=self.mel_dim,
                                    kernel_size=5, strides=1, dilation_rate=1, activation=None))
 
     def call(self, input):
-        met_out_psnet = input
-        for conv in self.convs:
-            met_out_psnet = conv(met_out_psnet)
+        met_out_psnet = self.convs[0](input)
+        met_out_psnet = self.convs[1](met_out_psnet)
+        met_out_psnet = self.convs[2](met_out_psnet)
+        met_out_psnet = self.convs[3](met_out_psnet)
+        met_out_psnet = self.convs[4](met_out_psnet)
+        met_out_psnet = self.convs[5](met_out_psnet)
         return met_out_psnet
-
 
 class AutoVCF():
     def __init__(self, **kwargs):
@@ -167,62 +169,60 @@ class AutoVC(tfk.Model):
         self.freq = kwargs.get("freq", 32)
         self.lamda = kwargs.get("lamda", 0.01)
 
-        self.encoder = Encoder(dim_emb=self.dim_emb, 
+        self.encoder = Encoder(dim_emb=self.dim_emb,
                                dim_neck=self.dim_neck,
                                freq=self.freq)
         self.decoder = Decoder(dim_pre=self.dim_pre,
                                mel_dim=self.mel_dim)
         self.postnet = PostNet(mel_dim=self.mel_dim)
+        self.up_sampling = UpSampling(
+            dim_neck=self.dim_neck, time_dim=self.time_dim, dim_emb=self.dim_emb)
 
         # TODO: Check values and throw value exception if are none
 
+    def call(self, mel_spec, speaker_emb, trg_speaker_emb):
+        codes = self.encoder(mel_spec, speaker_emb)
+        upsampled_codes = self.up_sampling(codes, trg_speaker_emb)
+        mel_decoder = self.decoder(upsampled_codes)
+        mel_postnet = self.postnet(mel_decoder)
+        return mel_postnet
+
+
     def train_step(self, data):
-        
+
         mel_spec, speaker_emb, trg_speaker_emb = data[0]
 
         with tf.GradientTape() as tape:
             # Forward pass
             codes = self.encoder(mel_spec, speaker_emb)
-            upsampled_codes = self.up_sampling_concat(codes, trg_speaker_emb)
+            upsampled_codes = self.up_sampling(codes, trg_speaker_emb)
             mel_decoder = self.decoder(upsampled_codes)
             mel_postnet = self.postnet(mel_decoder)
+            # Compute our own loss
+            loss_id = tfk.losses.MSE(mel_spec, mel_decoder)
+            loss_id_psnt = tfk.losses.MSE(mel_spec, mel_postnet)
+            loss_net = loss_id + loss_id_psnt
+
+        # Compute gradients
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(loss_net, trainable_vars)
+        # Update weights
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+
+        with tf.GradientTape() as tape:
             # Reconstructing Bottlneck
             recon_codes = self.encoder(mel_postnet, speaker_emb)
             recon_codes = tf.concat(recon_codes, axis=-1)
             codes = tf.concat(codes, axis=-1)
-
-            # Compute our own loss
-            loss_id = tfk.losses.MSE(mel_spec, mel_decoder)
-            loss_id_psnt = tfk.losses.MSE(mel_postnet, mel_postnet)
             loss_cd = tfk.losses.MAE(codes, recon_codes)
-            loss_cd = tf.expand_dims(loss_cd, axis=-1)
-            loss = loss_id + loss_id_psnt + self.lamda * loss_cd
+            loss_cd = tf.math.scalar_mul(self.lamda, loss_cd)
 
         # Compute gradients
-        trainable_vars = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_vars)
+        trainable_vars_encoder = self.encoder.trainable_variables
+        gradients_encoder = tape.gradient(loss_cd, trainable_vars_encoder)
 
         # Update weights
-        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+        self.optimizer.apply_gradients(
+            zip(gradients_encoder, trainable_vars_encoder))
 
-        return {"loss": loss, "loss_id": loss_id, "loss_id_psnt": loss_id_psnt, "loss_cd": loss_cd}
-
-    @tf.function
-    def up_sampling_concat(self, codes, trg_emb):
-        tmp = []
-        for code in codes:
-
-            batch_size = tf.shape(code)[0]
-            down_size = tf.shape(code)[1]
-
-            tmp.append(tf.broadcast_to(
-                tf.expand_dims(code, axis=1), [batch_size, self.time_dim // len(codes), down_size]))
-
-        up_codes = tf.concat(tmp, axis=1)
-
-        trg_emb = tf.broadcast_to(
-            tf.expand_dims(trg_emb, axis=1),
-            [tf.shape(trg_emb)[0], self.time_dim, trg_emb.shape[1]])
-
-        output = tf.concat([up_codes, trg_emb], axis=-1)
-        return output
+        return {"loss_net": loss_net, "loss_cd": loss_cd}
