@@ -1,32 +1,50 @@
 
 import tensorflow as tf
-import numpy as np
-from keras.models import Sequential
-from keras.layers import LSTM,Dense,Lambda,Masking
-from tensorflow import keras
 from speaker_encoder.speaker_encoder_utils import speaker_centroids,utterance_centroids,similarity_matrix,calculate_loss
-import keras.backend as K
+from keras.layers import LSTM,Dense,Lambda,Masking
+
+tfk = tf.keras
+tfkl = tfk.layers
 
 
+# def __init__(self, num_layers=3, dim_input=40, dim_cell=256, dim_emb=64):
+    
+# super(D_VECTOR, self).__init__()
+#         self.lstm = nn.LSTM(input_size=dim_input, hidden_size=dim_cell, 
+#                             num_layers=num_layers, batch_first=True)  
+#         self.embedding = nn.Linear(dim_cell, dim_emb)
+
+# def forward(self, x):
+#         self.lstm.flatten_parameters()            
+#         lstm_out, _ = self.lstm(x)
+#         embeds = self.embedding(lstm_out[:,-1,:])
+#         norm = embeds.norm(p=2, dim=-1, keepdim=True) 
+#         embeds_normalized = embeds.div(norm)
+#         return embeds_normalized
 
 
-class SpeechEmbedder(keras.Model):
-    def __init__(self, time_dim=13, melfilters_dim=32):
+class SpeechEmbedder(tfk.Model):
+    def __init__(self, dim_input=80, dim_cell=768, dim_emb=256, time_dim=128):
         super(SpeechEmbedder, self).__init__()
-        self.model = Sequential()
-        self.model.add(Masking(mask_value=-1.0,
-                               input_shape=(time_dim, melfilters_dim)))
+        self.masking = tfkl.Masking(mask_value=-1.0,
+                               input_shape=(time_dim, dim_input))
+        self.lstm1 = tfkl.LSTM(dim_cell, return_sequences=True,
+                            input_shape= (None,dim_input), name="lstm1")
+        self.lstm2 = tfkl.LSTM(dim_cell, return_sequences=True, name="lstm2")
+        self.lstm3 = tfkl.LSTM(dim_cell, return_sequences=True, name="lstm3")
+        self.embedding = tfkl.Dense(dim_emb, name="embedding")
 
-        self.model.add(LSTM(768, return_sequences=True,
-                            input_shape= (None ,melfilters_dim)))
-        self.model.add(LSTM(768))
-        # TODO: check activation function
-        self.model.add(Dense(256 ,activation='relu'))
-        # TODO: check if this L2 normalization is well done
-        self.model.add(Lambda(lambda x: K.l2_normalize(x ,axis=1)))
 
     def call(self, inputs):
-        return self.model(inputs)
+        masking_out = self.masking(inputs)
+        lstm_out = self.lstm1(masking_out)
+        lstm_out = self.lstm2(lstm_out)
+        lstm_out = self.lstm3(lstm_out)
+        embeds = self.embedding(lstm_out[:,-1,:])
+        embeds_normalized = tf.math.l2_normalize(embeds, axis=-1)
+
+        return embeds_normalized
+
 
 
 class GE2ELoss(keras.layers.Layer):
