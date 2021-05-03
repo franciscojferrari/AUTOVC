@@ -31,18 +31,35 @@ def _bytes_feature(value: Any) -> tf.train.Feature:
         value = value.numpy()  # BytesList won't unpack a string from an EagerTensor.
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
+
 def _int64_feature(value: int) -> tf.train.Feature:
     """Returns an int64_list from a bool / enum / int / uint."""
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 
 # Create a dictionary with features that may be relevant.
-def spectrogram_example(spectrogram_string: str, label: int, subset:str) -> tf.train.Example:
+def spectrogram_example(
+    spectrogram_string: str, label: int, subset: bytes
+) -> tf.train.Example:
     serialized_tensor = tf.io.serialize_tensor(spectrogram_string)
     feature = {
         "label": _int64_feature(label),
         "mel_spectrogram": _bytes_feature(serialized_tensor),
-        "subset": _bytes_feature(subset)
+        "subset": _bytes_feature(subset),
+    }
+
+    return tf.train.Example(features=tf.train.Features(feature=feature))
+
+
+def spectrogram_example_vctk(example: tf.train.Example) -> tf.train.Example:
+    serialized_tensor = tf.io.serialize_tensor(example["speech"])
+
+    feature = {
+        "id": _bytes_feature(example["id"]),
+        "speaker": _int64_feature(example["speaker"]),
+        "gender": _int64_feature(example["gender"]),
+        "accent": _int64_feature(example["accent"]),
+        "speech": _bytes_feature(serialized_tensor),
     }
 
     return tf.train.Example(features=tf.train.Features(feature=feature))
@@ -75,9 +92,28 @@ def get_all_files(path: str, extension: str) -> List[str]:
     return file_names
 
 
-def _parse_spectrograms(example: Dict) -> Dict:
+def parse_spectrograms(example: Dict) -> Dict:
     """Convert the serialized tensor back to a tensor."""
     example["mel_spectrogram"] = tf.io.parse_tensor(
-        example["mel_spectrogram"], out_type=tf.float32
+        example["mel_spectrogram"].numpy()[0], out_type=tf.float32
     )
     return example
+
+
+def raw_audio_to_spectrogram(speech_tensor: tf.Tensor, config: Dict) -> tf.Tensor:
+    spectrogram = tfio.experimental.audio.spectrogram(
+        speech_tensor,
+        nfft=config["nfft"],
+        window=config["window"],
+        stride=config["stride"],
+    )
+
+    mel_spectrogram = tfio.experimental.audio.melscale(
+        spectrogram,
+        rate=config["rate"],
+        mels=config["mels"],
+        fmin=config["fmin"],
+        fmax=config["fmax"],
+    )
+
+    return mel_spectrogram
