@@ -125,41 +125,6 @@ class PostNet(tfkl.Layer):
         return met_out_psnet
 
 
-class AutoVCF():
-    def __init__(self, **kwargs):
-        self.time_dim = kwargs.get("time_dim", 128)
-        self.dim_emb = kwargs.get("dim_emb", 256)
-        self.dim_pre = kwargs.get("dim_pre", 512)
-        self.dim_neck = kwargs.get("dim_neck", 16)
-        self.mel_dim = kwargs.get("mel_dim", 80)
-        self.freq = kwargs.get("freq", 32)
-        self.lamda = kwargs.get("lamda", 0.01)
-        self.model = self.build_autovc()
-
-    def build_autovc(self):
-        mel_spec = tf.keras.layers.Input(shape = (self.time_dim, self.mel_dim))
-        speaker_emb = tf.keras.layers.Input(shape = (self.dim_emb))
-        trg_speaker_emb = tf.keras.layers.Input(shape = (self.dim_emb))
-
-        encoder = Encoder(dim_emb = self.dim_emb, dim_neck = self.dim_neck,
-                          freq = self.freq)
-
-        codes = encoder(mel_spec, speaker_emb)
-
-        upsampled_codes = UpSampling(time_dim = self.time_dim,
-                                     freq = self.freq)(codes, trg_speaker_emb)
-
-        mel_decoder = Decoder(dim_pre = self.dim_pre,
-                              mel_dim = self.mel_dim)(upsampled_codes)
-
-        mel_postnet = PostNet(mel_dim = self.mel_dim)(mel_decoder)
-
-        recon_codes = encoder(mel_postnet, speaker_emb)
-
-        return tfk.models.Model(inputs = [mel_spec, speaker_emb],
-                                outputs = [mel_decoder, mel_postnet, codes, recon_codes], name = self.name)
-
-
 class AutoVC(tfk.Model):
     def __init__(self, name = "AutoVC", *args, **kwargs):
         super(AutoVC, self).__init__(name = name)
