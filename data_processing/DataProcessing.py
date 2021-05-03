@@ -7,9 +7,15 @@ class DataWriter:
         self.bucket_path = bucket_name
         self.datasets = datasets
         self.config = config
+        self.mel_basis = None
+        self.min_level  = None
+        self.b = None
+        self.a = None
 
     def process_datasets(self, verbose=False, train_split=0.8):
         """Process datasets"""
+
+        self.mel_basis, self.min_level, self.b, self.a = get_filters(config=self.config)
 
         if self.config["dataset_tf"] == "librispeech":
 
@@ -80,7 +86,7 @@ class DataWriter:
         tensor = tf.cast(audio_tensor, tf.float32) / 32768.0
         tensor = tensor[:, 0]
 
-        return raw_audio_to_spectrogram(tensor, self.config)
+        return raw_audio_to_spectrogram_np(tensor, self.mel_basis, self.min_level, self.b, self.a)
 
     def process_files_vctk(self, example):
         speech_tensor = example["speech"]
@@ -89,7 +95,7 @@ class DataWriter:
             tf.cast(tf.sparse.to_dense(speech_tensor), dtype=tf.float32) / 32768.0
         )
 
-        example["speech"] = raw_audio_to_spectrogram(speech_tensor, self.config)
+        example["speech"] = raw_audio_to_spectrogram_np(speech_tensor, self.mel_basis, self.min_level, self.b, self.a)
         return example
 
     @staticmethod
