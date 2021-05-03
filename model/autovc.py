@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from layers import ConvNorm
+from .layers import ConvNorm
 
 tfk = tf.keras
 tfkl = tfk.layers
@@ -167,13 +167,12 @@ class AutoVC(tfk.Model):
 
             # Reconstructing Bottlneck
             recon_codes = self.encoder(mel_postnet, speaker_emb)
-            recon_codes = tf.concat(recon_codes, axis=-1)
-            codes = tf.concat(codes, axis=-1)
-            
-            
+            recon_codes = tf.concat(recon_codes, axis = -1)
+            codes = tf.concat(codes, axis = -1)
+
             # Compute our own loss
             mae = tf.keras.losses.MeanAbsoluteError()
-            
+
             loss_id = tfk.losses.MSE(mel_spec, mel_decoder)
             loss_id_psnt = tfk.losses.MSE(mel_spec, mel_postnet)
             loss_cd = mae(codes, recon_codes)
@@ -186,4 +185,4 @@ class AutoVC(tfk.Model):
         # Update weights
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-        return {"loss": loss_net, "loss_id": loss_id, "loss_id_psnt":loss_id_psnt, "loss_cd": loss_cd}
+        return {"loss": loss_net, "loss_id": loss_id, "loss_id_psnt": loss_id_psnt, "loss_cd": loss_cd}
