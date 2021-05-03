@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from .layers import ConvNorm
+from layers import ConvNorm
 
 tfk = tf.keras
 tfkl = tfk.layers
@@ -199,10 +199,21 @@ class AutoVC(tfk.Model):
             upsampled_codes = self.up_sampling(codes, trg_speaker_emb)
             mel_decoder = self.decoder(upsampled_codes)
             mel_postnet = self.postnet(mel_decoder)
+
+            # Reconstructing Bottlneck
+            recon_codes = self.encoder(mel_postnet, speaker_emb)
+            recon_codes = tf.concat(recon_codes, axis=-1)
+            codes = tf.concat(codes, axis=-1)
+            
+            
             # Compute our own loss
+            mae = tf.keras.losses.MeanAbsoluteError()
+            
             loss_id = tfk.losses.MSE(mel_spec, mel_decoder)
             loss_id_psnt = tfk.losses.MSE(mel_spec, mel_postnet)
-            loss_net = loss_id + loss_id_psnt
+            loss_cd = mae(codes, recon_codes)
+            loss_cd = tf.math.scalar_mul(self.lamda, loss_cd)
+            loss_net = loss_id + loss_id_psnt + loss_cd
 
         # Compute gradients
         trainable_vars = self.trainable_variables
@@ -210,20 +221,4 @@ class AutoVC(tfk.Model):
         # Update weights
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
 
-        with tf.GradientTape() as tape:
-            # Reconstructing Bottlneck
-            recon_codes = self.encoder(mel_postnet, speaker_emb)
-            recon_codes = tf.concat(recon_codes, axis = -1)
-            codes = tf.concat(codes, axis = -1)
-            loss_cd = tfk.losses.MAE(codes, recon_codes)
-            loss_cd = tf.math.scalar_mul(self.lamda, loss_cd)
-
-        # Compute gradients
-        trainable_vars_encoder = self.encoder.trainable_variables
-        gradients_encoder = tape.gradient(loss_cd, trainable_vars_encoder)
-
-        # Update weights
-        self.optimizer.apply_gradients(
-            zip(gradients_encoder, trainable_vars_encoder))
-
-        return {"loss_net": loss_net, "loss_cd": loss_cd}
+        return {"loss": loss_net, "loss_id": loss_id, "loss_id_psnt":loss_id_psnt, "loss_cd": loss_cd}
