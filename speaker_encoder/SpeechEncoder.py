@@ -4,7 +4,7 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers import LSTM,Dense,Lambda,Masking
 from tensorflow import keras
-from speaker_encoder_utils import speaker_centroids,utterance_centroids,similarity_matrix,calculate_loss
+from speaker_encoder.speaker_encoder_utils import speaker_centroids,utterance_centroids,similarity_matrix,calculate_loss
 import keras.backend as K
 
 

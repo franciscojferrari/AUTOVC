@@ -76,12 +76,18 @@ def similarity_matrix(embeddings, speaker_centroids, utterance_centroids):
 
 def calculate_loss(sim_matrix):
     same_idx = list(range(sim_matrix.shape[0]))
-    sim_matrix = sim_matrix.numpy()
-    pos = sim_matrix[same_idx, :, same_idx]
-    in_neg = (np.exp(sim_matrix))
-    neg = np.log(np.sum(in_neg,axis=2)+ 1e-6)
+    pos = tf.stack([sim_matrix[i,:,i] for i in same_idx], axis=0)
+    in_neg = tf.math.exp(sim_matrix)
+    neg = tf.math.log(tf.math.reduce_sum(in_neg,axis=2)+ 1e-6)
     per_embedding_loss = -1 * (pos - neg)
-    return per_embedding_loss.sum()
+    loss = tf.reduce_sum(per_embedding_loss)
+    #sim_matrix = sim_matrix.numpy()
+    #pos = sim_matrix[same_idx, :, same_idx]
+    #in_neg = (np.exp(sim_matrix))
+    #neg = np.log(np.sum(in_neg,axis=2)+ 1e-6)
+    #per_embedding_loss = -1 * (pos - neg)
+    #loss = per_embedding_loss.sum()
+    return loss
 
 def parse_spectrograms(example):
     """Convert the serialized tensor back to a tensor."""
