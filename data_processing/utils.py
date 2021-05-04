@@ -45,13 +45,15 @@ def _int64_feature(value: int) -> tf.train.Feature:
 
 # Create a dictionary with features that may be relevant.
 def spectrogram_example(
-    spectrogram_string: str, label: int, subset: bytes
+    spectrogram_string: str, label: int, subset: bytes, speaker_embedding: tf.Tensor
 ) -> tf.train.Example:
     serialized_tensor = tf.io.serialize_tensor(spectrogram_string)
+    serialized_speaker_embedding = tf.io.serialize_tensor(speaker_embedding)
     feature = {
         "label": _int64_feature(label),
         "mel_spectrogram": _bytes_feature(serialized_tensor),
         "subset": _bytes_feature(subset),
+        "speaker_embedding": _bytes_feature(serialized_speaker_embedding),
     }
 
     return tf.train.Example(features=tf.train.Features(feature=feature))
@@ -59,6 +61,7 @@ def spectrogram_example(
 
 def spectrogram_example_vctk(example: tf.train.Example) -> tf.train.Example:
     serialized_tensor = tf.io.serialize_tensor(example["speech"])
+    serialized_speaker_embedding = tf.io.serialize_tensor(example["speaker_embedding"])
 
     feature = {
         "id": _bytes_feature(example["id"]),
@@ -66,6 +69,7 @@ def spectrogram_example_vctk(example: tf.train.Example) -> tf.train.Example:
         "gender": _int64_feature(example["gender"]),
         "accent": _int64_feature(example["accent"]),
         "speech": _bytes_feature(serialized_tensor),
+        "speaker_embedding": _bytes_feature(serialized_speaker_embedding),
     }
 
     return tf.train.Example(features=tf.train.Features(feature=feature))
@@ -109,6 +113,13 @@ def parse_spectrograms(example: Dict) -> Dict:
 def parse_spectrograms_vctk(example: Dict) -> Dict:
     example["speech"] = tf.io.parse_tensor(
         example["speech"].numpy()[0], out_type=tf.float32
+    )
+    return example
+
+
+def parse_speaker_embedding(example: Dict) -> Dict:
+    example["speaker_embedding"] = tf.io.parse_tensor(
+        example["speaker_embedding"].numpy()[0], out_type=tf.float32
     )
     return example
 
@@ -176,4 +187,4 @@ def raw_audio_to_spectrogram_np(speech_tensor: tf.Tensor, mel_basis, min_level, 
     D_db = 20 * np.log10(np.maximum(min_level, D_mel)) - 16
     S = np.clip((D_db + 100) / 100, 0, 1)
 
-    return S
+    return tf.convert_to_tensor(S, dtype=tf.float32)

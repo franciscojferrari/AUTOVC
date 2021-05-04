@@ -23,3 +23,6 @@ rate: 16000
 mels: 80
 fmin: 125
 fmax: 7600
+
+max_length: 128
+
