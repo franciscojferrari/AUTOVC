@@ -5,7 +5,8 @@ import torch
 from data_processing.utils import *
 from collections import OrderedDict
 from pre_trained_models.speaker_embedder import SpeakerEmbedder
-
+tfk = tf.keras
+LEN_CROP=128
 
 class DataWriter:
     def __init__(self, bucket_name, datasets, config):
@@ -204,7 +205,23 @@ class DataReader:
             }
         else:
             raise NotImplemented
-        return tf.io.parse_single_example(example_proto, feature_description)
+        mel = "mel_spectrogram" if self.config["dataset_tf"] == "librispeech" else "speech"
+        content = tf.io.parse_single_example(
+            example_proto, feature_description)
+        
+        mel_spectrogram = tf.io.parse_tensor(
+            content[mel][0], out_type=tf.float32
+        )
+
+        mel_spectrogram = tfk.preprocessing.sequence.pad_sequences(
+                        [mel_spectrogram], maxlen=LEN_CROP, dtype='float32', padding='pre',
+                        truncating='pre', value=0.0)[0]
+
+        speaker_embedding = tf.io.parse_tensor(
+            content["speaker_embedding"][0], out_type=tf.float32
+        )
+        
+        return (mel_spectrogram, speaker_embedding, speaker_embedding)
 
     def read_data_set(self, tfrecord_path: str) -> tf.data.TFRecordDataset:
         """Read speaker dataset and parse it."""
