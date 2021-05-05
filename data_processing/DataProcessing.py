@@ -1,5 +1,10 @@
 import matplotlib.pyplot as plt
+import random
+import torch
+
 from data_processing.utils import *
+from collections import OrderedDict
+from pre_trained_models.speaker_embedder import SpeakerEmbedder
 
 
 class DataWriter:
@@ -7,9 +12,18 @@ class DataWriter:
         self.bucket_path = bucket_name
         self.datasets = datasets
         self.config = config
+        self.mel_basis = None
+        self.min_level = None
+        self.b = None
+        self.a = None
+        self.C = None
+
+        self.load_speaker_embedder()
 
     def process_datasets(self, verbose=False, train_split=0.8):
         """Process datasets"""
+
+        self.mel_basis, self.min_level, self.b, self.a = get_filters(config=self.config)
 
         if self.config["dataset_tf"] == "librispeech":
 
@@ -38,6 +52,13 @@ class DataWriter:
                     ).numpy()
                     with tf.io.TFRecordWriter(record_file) as writer:
                         for i, processed_file in processed_files.enumerate():
+
+                            processed_file = raw_audio_to_spectrogram_np(processed_file,
+                                                                         self.mel_basis,
+                                                                         self.min_level,
+                                                                         self.b,
+                                                                         self.a)
+
                             subset = (
                                 b"train" if i <= train_split * n_samples else b"test"
                             )
@@ -46,8 +67,17 @@ class DataWriter:
                                 data = tf.math.log(processed_file).numpy()
                                 plt.imshow(data, aspect="auto")
                                 plt.show()
+
+                            # Don't process utterance that are shorter then
+                            if processed_file.shape[0] < self.config["max_length"]:
+                                print(f"{processed_file.shape[0]}")
+                                continue
+
+                            # Create the speaker embedding here
+                            speaker_embedding = self.get_speaker_embedding(processed_file)
+
                             tf_example = spectrogram_example(
-                                processed_file, label, subset
+                                processed_file, label, subset, speaker_embedding
                             )
                             writer.write(tf_example.SerializeToString())
         else:
@@ -65,11 +95,20 @@ class DataWriter:
                     f"{self.bucket_path}/processed_datasets/{self.config['dataset_tf']}"
                 )
                 file_nm = vctk_file.split(".")[-1]
-                print(file_nm)
+
                 record_file = os.path.join(write_path, file_nm)
 
                 with tf.io.TFRecordWriter(record_file) as writer:
                     for example in processed:
+                        example["speech"] = raw_audio_to_spectrogram_np(example["speech"], self.mel_basis, self.min_level, self.b, self.a)
+
+                        # Don't process utterance that are shorter then
+                        if example["speech"].shape[0] < self.config["max_length"]:
+                            print(f"{example['speech'].shape[0]}")
+                            continue
+
+                        # Create speaker embedding
+                        example["speaker_embedding"] = self.get_speaker_embedding(example['speech'])
                         tf_example = spectrogram_example_vctk(example)
                         writer.write(tf_example.SerializeToString())
 
@@ -80,7 +119,7 @@ class DataWriter:
         tensor = tf.cast(audio_tensor, tf.float32) / 32768.0
         tensor = tensor[:, 0]
 
-        return raw_audio_to_spectrogram(tensor, self.config)
+        return tensor
 
     def process_files_vctk(self, example):
         speech_tensor = example["speech"]
@@ -89,7 +128,7 @@ class DataWriter:
             tf.cast(tf.sparse.to_dense(speech_tensor), dtype=tf.float32) / 32768.0
         )
 
-        example["speech"] = raw_audio_to_spectrogram(speech_tensor, self.config)
+        example["speech"] = speech_tensor
         return example
 
     @staticmethod
@@ -100,8 +139,34 @@ class DataWriter:
             "gender": tf.io.FixedLenFeature([], tf.int64),
             "accent": tf.io.FixedLenFeature([], tf.int64),
             "speech": tf.io.VarLenFeature(tf.int64),
+            "speaker_embedding": tf.io.VarLenFeature(tf.float32),
         }
         return tf.io.parse_single_example(example_proto, feature_description_vctk)
+
+    def get_speaker_embedding(self, mel_spectrogram: tf.Tensor) -> tf.Tensor:
+        embeddings = []
+        for _ in range(self.config["nr_sample"]):
+            length_spectrogram = mel_spectrogram.shape[0]
+            idx = random.randint(0, length_spectrogram - self.config["max_length"])
+            mel_temp = np.array(mel_spectrogram[idx:idx + self.config["max_length"]])
+            mel_temp = torch.from_numpy(np.expand_dims(mel_temp, axis=0))
+            embedding = self.C(mel_temp)
+            embeddings.append(embedding.detach().numpy())
+
+        speaker_embedding = np.array(embeddings).mean(axis=0)
+        return tf.convert_to_tensor(speaker_embedding)
+
+    def load_speaker_embedder(self) -> None:
+        C = SpeakerEmbedder(dim_input=80, dim_cell=768, dim_emb=256).eval()  # .cuda()
+        c_checkpoint = torch.load('/content/DataSet/pre_trained_models/3000000-BL.ckpt',
+                                  map_location=torch.device('cpu'))
+        new_state_dict = OrderedDict()
+        for key, val in c_checkpoint['model_b'].items():
+            new_key = key[7:]
+            new_state_dict[new_key] = val
+        C.load_state_dict(new_state_dict)
+
+        self.C = C
 
 
 class DataReader:
@@ -126,6 +191,7 @@ class DataReader:
                 "label": tf.io.FixedLenFeature([], tf.int64),
                 "mel_spectrogram": tf.io.RaggedFeature(tf.string),
                 "subset": tf.io.FixedLenFeature([], tf.string),
+                "speaker_embedding": tf.io.RaggedFeature(tf.string),
             }
         elif self.config["dataset_tf"] == "vctk":
             feature_description = {
@@ -133,7 +199,8 @@ class DataReader:
                 "speaker": tf.io.FixedLenFeature([], tf.int64),
                 "gender": tf.io.FixedLenFeature([], tf.int64),
                 "accent": tf.io.FixedLenFeature([], tf.int64),
-                "mel_spectrogram": tf.io.RaggedFeature(tf.string),
+                "speech": tf.io.RaggedFeature(tf.string),
+                "speaker_embedding": tf.io.RaggedFeature(tf.string),
             }
         else:
             raise NotImplemented
@@ -147,15 +214,19 @@ class DataReader:
 
     def find_vctk_datasets(self):
         """Find all vctk datasets in dataset directory."""
-        path = os.path.join(self.base_path, self.dataset)
+        path = os.path.join(
+            self.config["bucket_name"], self.base_path
+        )
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith("00512"):
-                    self.speaker_files.append(os.path.join(root, file))
+                    self.dataset_files.append(os.path.join(root, file))
 
     def find_speaker_datasets(self) -> None:
         """Find all speaker datasets in dataset directory."""
-        path = os.path.join(self.config["bucket_name"], self.base_path)
+        path = os.path.join(
+            self.config["bucket_name"], self.base_path
+        )
         for root, dirs, files in os.walk(path):
             for file in files:
                 if file.endswith(".tfrecords"):
@@ -176,8 +247,7 @@ class DataReader:
         if self.config["dataset_tf"] == "librispeech":
             # Load the data for each speaker
             for speaker_file, speaker_id in zip(self.speaker_files, self.speaker_ids):
-                dataset = self.read_data_set(speaker_file)
-                self.datasets[speaker_id] = dataset.map(parse_spectrograms)
+                self.datasets[speaker_id] = self.read_data_set(speaker_file)
         elif self.config["dataset_tf"] == "vctk":
             # Load the data per sub dataset
             for dataset_file in self.dataset_files:
