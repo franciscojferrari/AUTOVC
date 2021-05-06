@@ -6,7 +6,6 @@ from data_processing.utils import *
 from collections import OrderedDict
 from pre_trained_models.speaker_embedder import SpeakerEmbedder
 tfk = tf.keras
-LEN_CROP=128
 
 class DataWriter:
     def __init__(self, bucket_name, datasets, config):
@@ -73,12 +72,13 @@ class DataWriter:
                             if processed_file.shape[0] < self.config["max_length"]:
                                 print(f"{processed_file.shape[0]}")
                                 continue
-
+                            
+                            time_dim = processed_file.shape[0]
                             # Create the speaker embedding here
                             speaker_embedding = self.get_speaker_embedding(processed_file)
 
                             tf_example = spectrogram_example(
-                                processed_file, label, subset, speaker_embedding
+                                processed_file, label, subset, speaker_embedding, time_dim
                             )
                             writer.write(tf_example.SerializeToString())
         else:
@@ -110,6 +110,7 @@ class DataWriter:
 
                         # Create speaker embedding
                         example["speaker_embedding"] = self.get_speaker_embedding(example['speech'])
+                        
                         tf_example = spectrogram_example_vctk(example)
                         writer.write(tf_example.SerializeToString())
 

@@ -45,7 +45,7 @@ def _int64_feature(value: int) -> tf.train.Feature:
 
 # Create a dictionary with features that may be relevant.
 def spectrogram_example(
-    spectrogram_string: str, label: int, subset: bytes, speaker_embedding: tf.Tensor
+    spectrogram_string: str, label: int, subset: bytes, speaker_embedding: tf.Tensor, time_dim: int
 ) -> tf.train.Example:
     serialized_tensor = tf.io.serialize_tensor(spectrogram_string)
     serialized_speaker_embedding = tf.io.serialize_tensor(speaker_embedding)
@@ -54,6 +54,7 @@ def spectrogram_example(
         "mel_spectrogram": _bytes_feature(serialized_tensor),
         "subset": _bytes_feature(subset),
         "speaker_embedding": _bytes_feature(serialized_speaker_embedding),
+        "time_len": _int64_feature(time_dim),
     }
 
     return tf.train.Example(features=tf.train.Features(feature=feature))
