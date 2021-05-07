@@ -194,7 +194,7 @@ class DataReader:
                 "mel_spectrogram": tf.io.RaggedFeature(tf.string),
                 "subset": tf.io.FixedLenFeature([], tf.string),
                 "speaker_embedding": tf.io.RaggedFeature(tf.string),
-                "time_dim": tf.io.FixedLenFeature([], tf.int64),
+                "time_len": tf.io.FixedLenFeature([], tf.int64),
             }
         elif self.config["dataset_tf"] == "vctk":
             feature_description = {
@@ -214,7 +214,7 @@ class DataReader:
             content["mel_spectrogram"][0], out_type=tf.float32
         )
         mel_spectrogram = tf.reshape(
-            mel_spectrogram, [content["time_dim"], self.config["mels"]])
+            mel_spectrogram, [content["time_len"], self.config["mels"]])
         mel_spectrogram = tfk.preprocessing.sequence.pad_sequences(
             [mel_spectrogram], maxlen=self.config["max_length"], dtype='float32', padding='pre',
                         truncating='pre', value=0.0)[0]
