@@ -7,6 +7,7 @@ from collections import OrderedDict
 from pre_trained_models.speaker_embedder import SpeakerEmbedder
 tfk = tf.keras
 
+AUTOTUNE = tf.data.experimental.AUTOTUNE
 
 class DataWriter:
     def __init__(self, bucket_name, datasets, config):
@@ -290,3 +291,10 @@ class DataReader:
     def get_datasets(self) -> Dict:
         """Getter for all datasets."""
         return self.datasets
+
+    def get_training_dataset(self):
+        training_dataset = tf.data.TFRecordDataset(
+            self.speaker_files, num_parallel_reads=AUTOTUNE)
+        training_dataset = training_dataset.map(
+            self._parse_function, num_parallel_calls=AUTOTUNE).batch(self.config.batch_size, drop_remainder=True).prefetch(AUTOTUNE)
+        return training_dataset

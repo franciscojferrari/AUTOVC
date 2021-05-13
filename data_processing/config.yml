@@ -27,3 +27,4 @@ fmax: 7600
 max_length: 128
 nr_sample: 10
 
+batch_size: 2
