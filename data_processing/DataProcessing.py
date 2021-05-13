@@ -297,5 +297,5 @@ class DataReader:
         training_dataset = tf.data.TFRecordDataset(
             self.speaker_files, num_parallel_reads=AUTOTUNE)
         training_dataset = training_dataset.map(
-            self._parse_function, num_parallel_calls=AUTOTUNE).batch(self.config.batch_size, drop_remainder=True).prefetch(AUTOTUNE)
+            self._parse_function, num_parallel_calls=AUTOTUNE).batch(self.config['batch_size'], drop_remainder=True).prefetch(AUTOTUNE)
         return training_dataset
