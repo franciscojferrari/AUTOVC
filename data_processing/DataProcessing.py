@@ -7,6 +7,7 @@ from collections import OrderedDict
 from pre_trained_models.speaker_embedder import SpeakerEmbedder
 tfk = tf.keras
 
+
 class DataWriter:
     def __init__(self, bucket_name, datasets, config):
         self.bucket_path = bucket_name
@@ -23,7 +24,8 @@ class DataWriter:
     def process_datasets(self, verbose=False, train_split=0.8):
         """Process datasets"""
 
-        self.mel_basis, self.min_level, self.b, self.a = get_filters(config=self.config)
+        self.mel_basis, self.min_level, self.b, self.a = get_filters(
+            config=self.config)
 
         if self.config["dataset_tf"] == "librispeech":
 
@@ -72,10 +74,11 @@ class DataWriter:
                             if processed_file.shape[0] < self.config["max_length"]:
                                 print(f"{processed_file.shape[0]}")
                                 continue
-                            
+
                             time_dim = processed_file.shape[0]
                             # Create the speaker embedding here
-                            speaker_embedding = self.get_speaker_embedding(processed_file)
+                            speaker_embedding = self.get_speaker_embedding(
+                                processed_file)
 
                             tf_example = spectrogram_example(
                                 processed_file, label, subset, speaker_embedding, time_dim
@@ -101,7 +104,8 @@ class DataWriter:
 
                 with tf.io.TFRecordWriter(record_file) as writer:
                     for example in processed:
-                        example["speech"] = raw_audio_to_spectrogram_np(example["speech"], self.mel_basis, self.min_level, self.b, self.a)
+                        example["speech"] = raw_audio_to_spectrogram_np(
+                            example["speech"], self.mel_basis, self.min_level, self.b, self.a)
 
                         # Don't process utterance that are shorter then
                         if example["speech"].shape[0] < self.config["max_length"]:
@@ -109,8 +113,9 @@ class DataWriter:
                             continue
 
                         # Create speaker embedding
-                        example["speaker_embedding"] = self.get_speaker_embedding(example['speech'])
-                        
+                        example["speaker_embedding"] = self.get_speaker_embedding(
+                            example['speech'])
+
                         tf_example = spectrogram_example_vctk(example)
                         writer.write(tf_example.SerializeToString())
 
@@ -127,7 +132,8 @@ class DataWriter:
         speech_tensor = example["speech"]
 
         speech_tensor = (
-            tf.cast(tf.sparse.to_dense(speech_tensor), dtype=tf.float32) / 32768.0
+            tf.cast(tf.sparse.to_dense(speech_tensor),
+                    dtype=tf.float32) / 32768.0
         )
 
         example["speech"] = speech_tensor
@@ -149,8 +155,10 @@ class DataWriter:
         embeddings = []
         for _ in range(self.config["nr_sample"]):
             length_spectrogram = mel_spectrogram.shape[0]
-            idx = random.randint(0, length_spectrogram - self.config["max_length"])
-            mel_temp = np.array(mel_spectrogram[idx:idx + self.config["max_length"]])
+            idx = random.randint(0, length_spectrogram -
+                                 self.config["max_length"])
+            mel_temp = np.array(
+                mel_spectrogram[idx:idx + self.config["max_length"]])
             mel_temp = torch.from_numpy(np.expand_dims(mel_temp, axis=0))
             embedding = self.C(mel_temp)
             embeddings.append(embedding.detach().numpy())
@@ -159,7 +167,8 @@ class DataWriter:
         return tf.convert_to_tensor(speaker_embedding)
 
     def load_speaker_embedder(self) -> None:
-        C = SpeakerEmbedder(dim_input=80, dim_cell=768, dim_emb=256).eval()  # .cuda()
+        C = SpeakerEmbedder(dim_input=80, dim_cell=768,
+                            dim_emb=256).eval()  # .cuda()
         c_checkpoint = torch.load('/content/DataSet/pre_trained_models/3000000-BL.ckpt',
                                   map_location=torch.device('cpu'))
         new_state_dict = OrderedDict()
@@ -209,20 +218,18 @@ class DataReader:
             raise NotImplemented
         content = tf.io.parse_single_example(
             example_proto, feature_description)
-        
+
         mel_spectrogram = tf.io.parse_tensor(
             content["mel_spectrogram"][0], out_type=tf.float32
         )
         mel_spectrogram = tf.reshape(
-            mel_spectrogram, [content["time_len"], self.config["mels"]])
-        mel_spectrogram = tfk.preprocessing.sequence.pad_sequences(
-            [mel_spectrogram], maxlen=self.config["max_length"], dtype='float32', padding='pre',
-                        truncating='pre', value=0.0)[0]
-
+            mel_spectrogram, [self.config['max_length'], self.config['mels']])
         speaker_embedding = tf.io.parse_tensor(
             content["speaker_embedding"][0], out_type=tf.float32
         )
-        
+        speaker_embedding = tf.reshape(
+            speaker_embedding, [256, ])
+
         return (mel_spectrogram, speaker_embedding, speaker_embedding)
 
     def read_data_set(self, tfrecord_path: str) -> tf.data.TFRecordDataset:
