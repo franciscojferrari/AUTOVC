@@ -293,6 +293,7 @@ class DataReader:
         return self.datasets
 
     def get_training_dataset(self):
+        self.find_data_sets()
         training_dataset = tf.data.TFRecordDataset(
             self.speaker_files, num_parallel_reads=AUTOTUNE)
         training_dataset = training_dataset.map(
