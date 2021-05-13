@@ -16,10 +16,10 @@ class Encoder(tfkl.Layer):
     def build(self, input_shape):
         self.convs = [ConvNorm(name = f"enc_conv_{i}", filters = 512,
                                kernel_size = 5, strides = 1, dilation_rate = 1, activation = "relu") for
-                      i in tf.range(3)]
+                      i in range(3)]
         self.lstms = [
             tfkl.Bidirectional(tfkl.LSTM(name = f"enc_lstm_{i}", units = self.dim_neck, return_sequences = True))
-            for i in tf.range(2)]
+            for i in range(2)]
 
     def call(self, mel_spec, speak_emb):
         batch_size = tf.shape(speak_emb)[0]
@@ -41,8 +41,8 @@ class Encoder(tfkl.Layer):
         output_backward = output[:, :, self.dim_neck:]
 
         mask_forward = tf.equal(
-            tf.range(tf.shape(output_forward)[1]) % self.freq, 0)
-        mask_backward = tf.equal(tf.range(tf.shape(output_forward)[
+            range(tf.shape(output_forward)[1]) % self.freq, 0)
+        mask_backward = tf.equal(range(tf.shape(output_forward)[
                                               1] - self.freq + 1) % self.freq, 0)
         output_forward_down = tf.boolean_mask(
             output_forward, mask_forward, axis = 1)
@@ -84,9 +84,9 @@ class Decoder(tfkl.Layer):
     def build(self, input_shape):
         self.convs = [ConvNorm(name = f"dec_conv_{i}", filters = self.dim_pre,
                                kernel_size = 5, strides = 1, dilation_rate = 1, activation = "relu") for i in
-                      tf.range(3)]
+                      range(3)]
         self.lstms = [
-            tfkl.LSTM(name = f"dec_lstm_{i}", units = 1024, return_sequences = True) for i in tf.range(3)]
+            tfkl.LSTM(name = f"dec_lstm_{i}", units = 1024, return_sequences = True) for i in range(3)]
         self.conv1 = tfkl.Dense(self.mel_dim)
 
     def call(self, codes):
@@ -110,7 +110,7 @@ class PostNet(tfkl.Layer):
     def build(self, input_shape):
         self.convs = [ConvNorm(name = f"dec_conv_{i}", filters = 512,
                                kernel_size = 5, strides = 1, dilation_rate = 1, activation = "tanh") for i in
-                      tf.range(5)]
+                      range(5)]
 
         self.convs.append(ConvNorm(name = f"dec_conv_{5}", filters = self.mel_dim,
                                    kernel_size = 5, strides = 1, dilation_rate = 1, activation = None))
