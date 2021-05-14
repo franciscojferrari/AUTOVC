@@ -171,11 +171,11 @@ class AutoVC(tfk.Model):
             codes = tf.concat(codes, axis = -1)
 
             # Compute our own loss
-            mae = tf.keras.losses.MeanAbsoluteError()
-
-            loss_id = tfk.losses.MSE(mel_spec, mel_decoder)
-            loss_id_psnt = tfk.losses.MSE(mel_spec, mel_postnet)
-            loss_cd = mae(codes, recon_codes)
+            mae_loss = tf.keras.losses.MeanAbsoluteError()
+            mes_loss = tfk.losses.MeanSquaredError()
+            loss_id = mes_loss(mel_spec, mel_decoder)
+            loss_id_psnt = mes_loss(mel_spec, mel_postnet)
+            loss_cd = mae_loss(codes, recon_codes)
             loss_cd = tf.math.scalar_mul(self.lamda, loss_cd)
             loss_net = loss_id + loss_id_psnt + loss_cd
 
