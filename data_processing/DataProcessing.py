@@ -204,7 +204,6 @@ class DataReader:
                 "mel_spectrogram": tf.io.RaggedFeature(tf.string),
                 "subset": tf.io.FixedLenFeature([], tf.string),
                 "speaker_embedding": tf.io.RaggedFeature(tf.string),
-                "time_len": tf.io.FixedLenFeature([], tf.int64),
             }
         elif self.config["dataset_tf"] == "vctk":
             feature_description = {

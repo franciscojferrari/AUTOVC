@@ -156,7 +156,7 @@ class AutoVC(tfk.Model):
         return mel_postnet
 
     def train_step(self, data):
-        mel_spec, speaker_emb, trg_speaker_emb = data[0]
+        mel_spec, speaker_emb, trg_speaker_emb = data
 
         with tf.GradientTape() as tape:
             # Forward pass
