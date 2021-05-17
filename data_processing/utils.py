@@ -54,7 +54,6 @@ def spectrogram_example(
         "mel_spectrogram": _bytes_feature(serialized_tensor),
         "subset": _bytes_feature(subset),
         "speaker_embedding": _bytes_feature(serialized_speaker_embedding),
-        "time_len": _int64_feature(time_dim),
     }
 
     return tf.train.Example(features=tf.train.Features(feature=feature))
