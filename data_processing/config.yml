@@ -17,9 +17,14 @@ subdataset: "train-clean-100"
 
 # Processing variables.
 nfft: 1024
-window: 512 # Not yet sure what this should be
+window: 1024
 stride: 256
 rate: 16000
 mels: 80
 fmin: 125
 fmax: 7600
+
+max_length: 128
+nr_sample: 10
+
+batch_size: 2
