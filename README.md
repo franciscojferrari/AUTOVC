@@ -3,26 +3,21 @@ This repository is a part of our master's course in Speech and Speaker Recogniti
 
 ## Installation
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install foobar.
+Use the package manager [pip](https://pip.pypa.io/en/stable/) to install the requirements.
 
 ```bash
-pip install foobar
+pip install -r requirements.txt
+
 ```
 
 ## Usage
+There are two main parts of the project: the training of the speaker encoder and the training of the whole AUTOVC. 
+The training of the speaker encoder can be found in AUTOVC/speaker_encoder/experiments_speech.ipynb
+The training of the whole AUTOVC can be found in AUTOVC/experiments/test_training.ipynb
 
-```python
-import foobar
-
-foobar.pluralize('word') # returns 'words'
-foobar.pluralize('goose') # returns 'geese'
-foobar.singularize('phenomena') # returns 'phenomenon'
-```
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-
-Please make sure to update tests as appropriate.
 
 ## License
 [MIT](https://choosealicense.com/licenses/mit/)
