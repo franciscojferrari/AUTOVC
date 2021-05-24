@@ -1,5 +1,7 @@
 # AUTOVC
-This repository is a part of our master's course in Speech and Speaker Recognition (DT2119) taken in Spring 2021. In this project, we aim to implement a Voice conversor that only uses an autoencoder, being inspired by this paper. Voice conversion (VC) is a technique where the speaker characteristics of a source speaker are copied onto the speech contents of a target speaker, transforming the utterance of the target speaker such that it sounds like the source speaker.
+This repository is a part of our master's course in Speech and Speaker Recognition (DT2119) taken in Spring 2021. In this project, we aim to implement a Voice conversor that only uses an autoencoder, being inspired by this [paper](https://arxiv.org/abs/1905.05879) . Besides the implementation of the AUTOVC network we also train a speaker encoder from scratch, being inspired by this [paper](https://arxiv.org/abs/1710.10467)  
+
+Voice conversion (VC) is a technique where the speaker characteristics of a source speaker are copied onto the speech contents of a target speaker, transforming the utterance of the target speaker such that it sounds like the source speaker.
 
 ## Installation
 
@@ -7,7 +9,6 @@ Use the package manager [pip](https://pip.pypa.io/en/stable/) to install the req
 
 ```bash
 pip install -r requirements.txt
-
 ```
 
 ## Usage
