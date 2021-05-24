@@ -11,10 +11,10 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-There are two main parts of the project: the training of the speaker encoder and the training of the whole AUTOVC. 
-The training of the speaker encoder can be found in AUTOVC/speaker_encoder/experiments_speech.ipynb
-The training of the whole AUTOVC can be found in AUTOVC/experiments/test_training.ipynb
-
+### Training and experiments
+There are two main parts of the training: the training of the speaker encoder and the training of the whole AUTOVC. 
+* The training and the experiments of the speaker encoder can be found in AUTOVC/speaker_encoder/experiments_speech.ipynb
+* The training of the whole AUTOVC can be found in AUTOVC/experiments/test_training.ipynb
 
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
