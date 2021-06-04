@@ -1,0 +1,6 @@
+wavenet_vocoder
+tensorflow 
+librosa 
+torch 
+numpy 
+tqdm 
